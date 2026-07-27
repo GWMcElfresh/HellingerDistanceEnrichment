@@ -1,0 +1,10 @@
+.git
+.github
+*.Rcheck
+*.tar.gz
+.Rproj.user
+.Rhistory
+.RData
+raw_data.csv
+*frequencies*
+AlissaRothchild_SingleCellCategoricalDataProblem.r

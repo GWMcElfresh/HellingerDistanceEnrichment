@@ -1,0 +1,79 @@
+# Hellinger distance enrichment for subject-level categorical compositions
+
+`HellingerDistanceEnrichment` tests whether between-group Hellinger distances exceed
+within-group distances for subject-level categorical compositions (cluster counts,
+cell-type frequencies, or other multinomial summaries). The package accepts long
+count tables, Seurat metadata, or anndata `obs` and returns omnibus and pairwise
+contrast statistics with permutation or conjugate Dirichlet posterior-predictive
+Bayesian inference.
+
+## Installation
+
+```r
+# From GitHub (after cloning)
+remotes::install_local("path/to/HellingerDistanceEnrichment")
+```
+
+## Quick start (synthetic)
+
+```r
+library(HellingerDistanceEnrichment)
+
+long_table <- data.frame(
+  subjectId = rep(c("S1", "S2", "S3", "S4"), each = 3),
+  category = rep(paste0("Category", 0:2), 4),
+  group = rep(c("Control", "Control", "Case", "Case"), each = 3),
+  n = c(30, 30, 40, 35, 25, 40, 10, 20, 70, 15, 15, 70),
+  stringsAsFactors = FALSE
+)
+
+composition <- ExtractClusterComposition(long_table)
+
+result <- CompareGroupCompositions(
+  composition,
+  method = "permutation",
+  nPermutations = 500,
+  seed = 1
+)
+
+PlotCompositionContrasts(result)
+```
+
+## Docker / HPC
+
+Build or pull from GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/<owner>/hellinger-distance-enrichment:latest
+```
+
+Run the CLI on bind-mounted inputs (never bake study CSVs into the image):
+
+```bash
+docker run --rm \
+  -v /path/to/cohort:/data \
+  -v /path/to/output:/out \
+  ghcr.io/<owner>/hellinger-distance-enrichment:latest \
+  --input /data/composition_counts.csv \
+  --format long \
+  --output-dir /out \
+  --plot
+```
+
+On HPC, convert the image to SIF locally:
+
+```bash
+apptainer build hellinger-distance-enrichment.sif \
+  docker://ghcr.io/<owner>/hellinger-distance-enrichment:latest
+```
+
+## Methods
+
+- **Permutation:** shuffle group labels; p-value includes the observed ratio (workbook style).
+- **Bayes:** for each Dirichlet posterior draw of subject compositions, run a full nested permutation null; report the posterior mean p-value and effect-size credible intervals.
+
+Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted.
+
+## License
+
+GPL-3 (consistent with Seurat).

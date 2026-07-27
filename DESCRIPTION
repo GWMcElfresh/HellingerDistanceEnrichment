@@ -1,0 +1,29 @@
+Package: HellingerDistanceEnrichment
+Title: Hellinger Distance Enrichment for Categorical Composition Data
+Version: 0.1.0
+Authors@R: person("GW", "McElfresh", email = "gw@example.com", role = c("aut", "cre"))
+Description: Tests whether categorical compositions (e.g. cell-type or cluster
+    frequencies per subject) differ between groups using Hellinger-distance
+    enrichment ratios. Supports permutation and conjugate Dirichlet
+    posterior-predictive Bayesian inference with Seurat, anndata, and long-table
+    inputs.
+License: GPL-3 + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+    anndata,
+    egg,
+    ggplot2,
+    ggdist,
+    parallel,
+    reticulate,
+    Seurat,
+    stats,
+    utils
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3

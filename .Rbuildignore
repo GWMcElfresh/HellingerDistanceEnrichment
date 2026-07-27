@@ -1,0 +1,14 @@
+^raw_data\.csv$
+^.*frequencies.*$
+^\.R_libs$
+^\.git
+^\.github
+^\.dockerignore
+^Dockerfile$
+^exec/
+^.*\.Rproj$
+^\.Rhistory$
+^\.RData$
+^\.Ruserdata$
+^README\.md$
+^LICENSE\.md$

@@ -1,0 +1,17 @@
+subjectId,category,group,n
+Subj01,Category0,Control,25
+Subj01,Category1,Control,30
+Subj01,Category2,Control,20
+Subj01,Category3,Control,25
+Subj02,Category0,Control,40
+Subj02,Category1,Control,20
+Subj02,Category2,Control,20
+Subj02,Category3,Control,20
+Subj03,Category0,Treatment,10
+Subj03,Category1,Treatment,15
+Subj03,Category2,Treatment,35
+Subj03,Category3,Treatment,40
+Subj04,Category0,Treatment,12
+Subj04,Category1,Treatment,18
+Subj04,Category2,Treatment,30
+Subj04,Category3,Treatment,40
