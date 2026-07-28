@@ -2,6 +2,7 @@ url: https://gwmcelfresh.github.io/HellingerDistanceEnrichment/
 
 template:
   bootstrap: 5
+  math: true
 
 home:
   title: HellingerDistanceEnrichment
@@ -16,7 +17,7 @@ navbar:
     articles:
       text: Articles
       menu:
-        - text: Hellinger enrichment on synthetic compositions
+        - text: Hellinger enrichment for subject-level compositions
           href: articles/hellinger-enrichment.html
         - text: Extracting compositions from Seurat and anndata
           href: articles/extract-metadata.html

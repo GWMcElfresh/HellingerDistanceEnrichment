@@ -87,6 +87,60 @@ test_that("planted structure yields enrichment signal", {
     expect_gt(result$omnibus$effectSize, 1)
 })
 
+test_that("three-group design plants one arm without disturbing the other", {
+    groups <- c("Control", "Condition1", "Condition2")
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 8,
+        n_categories = 4,
+        groups = groups,
+        seed = 21
+    )
+    structured <- HellingerDistanceEnrichment:::plant_group_structure(
+        long_table,
+        target_group = "Condition1",
+        target_category = "Category0",
+        boost = 12
+    )
+
+    result <- CompareGroupCompositions(
+        structured,
+        method = "permutation",
+        nPermutations = 300,
+        seed = 88
+    )
+
+    contrasts <- result$contrasts
+    planted <- contrasts$contrastId == "Condition1_vs_Control"
+    null_arm <- contrasts$contrastId == "Condition2_vs_Control"
+
+    expect_lt(contrasts$pValue[planted], 0.15)
+    expect_gt(contrasts$pValue[null_arm], 0.2)
+    expect_lt(result$omnibus$pValue, 0.2)
+})
+
+test_that("plant_group_structure rejects unknown group or category", {
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(seed = 1)
+
+    expect_error(
+        HellingerDistanceEnrichment:::plant_group_structure(
+            long_table,
+            target_group = "MissingGroup"
+        ),
+        "target_group"
+    )
+    expect_error(
+        HellingerDistanceEnrichment:::plant_group_structure(
+            long_table,
+            target_category = "MissingCategory"
+        ),
+        "target_category"
+    )
+    expect_error(
+        HellingerDistanceEnrichment:::plant_group_structure(long_table, boost = 0),
+        "boost must be positive"
+    )
+})
+
 test_that("Bayes nesting smoke test returns finite posterior-mean p", {
     long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
         n_subjects_per_group = 5,
