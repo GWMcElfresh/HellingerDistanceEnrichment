@@ -9,7 +9,7 @@ Bayesian inference.
 
 ## Documentation
 
-Package articles (built vignettes) are published with pkgdown:
+Vignettes are published with pkgdown:
 
 https://gwmcelfresh.github.io/HellingerDistanceEnrichment/
 
@@ -61,7 +61,7 @@ Build or pull from GitHub Container Registry:
 docker pull ghcr.io/<owner>/hellinger-distance-enrichment:latest
 ```
 
-Run the CLI on bind-mounted inputs (never bake study CSVs into the image):
+Run the CLI on bind-mounted inputs:
 
 ```bash
 docker run --rm \
