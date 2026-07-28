@@ -7,12 +7,26 @@ count tables, Seurat metadata, or anndata `obs` and returns omnibus and pairwise
 contrast statistics with permutation or conjugate Dirichlet posterior-predictive
 Bayesian inference.
 
+## Documentation
+
+Package articles (built vignettes) are published with pkgdown:
+
+https://gwmcelfresh.github.io/HellingerDistanceEnrichment/
+
+- [Hellinger enrichment on synthetic compositions](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/hellinger-enrichment.html)
+- [Extracting compositions from Seurat and anndata](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/extract-metadata.html)
+
 ## Installation
 
 ```r
-# From GitHub (after cloning)
-remotes::install_local("path/to/HellingerDistanceEnrichment")
+# From GitHub
+remotes::install_github("GWMcElfresh/HellingerDistanceEnrichment", build_vignettes = TRUE)
+
+# Or from a local clone
+remotes::install_local("path/to/HellingerDistanceEnrichment", build_vignettes = TRUE)
 ```
+
+Browse installed vignettes with `browseVignettes("HellingerDistanceEnrichment")`.
 
 ## Quick start (synthetic)
 

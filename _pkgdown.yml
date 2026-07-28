@@ -1,0 +1,22 @@
+url: https://gwmcelfresh.github.io/HellingerDistanceEnrichment/
+
+template:
+  bootstrap: 5
+
+home:
+  title: HellingerDistanceEnrichment
+  description: >
+    Hellinger-distance enrichment for subject-level categorical compositions,
+    with permutation and conjugate Dirichlet posterior-predictive Bayes.
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+  components:
+    articles:
+      text: Articles
+      menu:
+        - text: Hellinger enrichment on synthetic compositions
+          href: articles/hellinger-enrichment.html
+        - text: Extracting compositions from Seurat and anndata
+          href: articles/extract-metadata.html

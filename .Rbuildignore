@@ -12,3 +12,6 @@
 ^\.Ruserdata$
 ^README\.md$
 ^LICENSE\.md$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

@@ -16,3 +16,4 @@ __pycache__/
 .venv/
 renv/library/
 renv/staging/
+docs/
