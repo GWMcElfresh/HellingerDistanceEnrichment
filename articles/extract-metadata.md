@@ -1,23 +1,102 @@
-# Extracting compositions from Seurat and anndata metadata
+# Extracting compositions from Seurat and anndata
 
-Single-cell workflows store the annotations needed for composition
-analysis at the cell level, while Hellinger enrichment operates on
-subject-level category counts. Bridging those scales depends on metadata
-columns that map each cell to a subject, a category (cluster or cell
-type), and an experimental group. This vignette builds tiny synthetic
-Seurat and anndata objects in memory and shows that both routes produce
-the same `CategoryComposition` input used by
-[`CompareGroupCompositions()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/CompareGroupCompositions.md).
+Single-cell pipelines store the annotations that define a composition at
+the cell level, while Hellinger enrichment operates on subject-level
+category counts. The gap between those scales is not a modeling choice;
+it is a bookkeeping step that must be correct before any distance or
+permutation test runs. Expression assays, normalized layers, and
+gene-level matrices are irrelevant to this step. What matters is whether
+each cell can be assigned to a subject, a categorical label (cluster,
+cell type, or other partition), and an experimental group that is
+constant for that subject.
 
-## Seurat metadata path
-
-For a Seurat object,
+Here, we show how
 [`ExtractClusterComposition()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ExtractClusterComposition.md)
-reads the requested columns from `meta.data`, aggregates cells to
-subjects, and returns the composition object. Expression counts are
-irrelevant to the enrichment step; only the metadata mapping matters.
-The example below creates a minimal object so the extraction path can be
-run without a study-sized dataset.
+bridges common single-cell containers to the `CategoryComposition`
+object used by
+[`CompareGroupCompositions()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/CompareGroupCompositions.md).
+The companion vignette on Hellinger enrichment covers the distance
+metric, enrichment ratio, and inference methods; this article focuses on
+getting the count table right.
+
+## Concepts
+
+### What metadata does enrichment need?
+
+Composition enrichment asks whether experimental groups differ in how
+subjects distribute cells across categories. That question is defined
+entirely by three metadata fields per cell: which subject the cell came
+from, which category it belongs to, and which group that subject is in.
+The mapping from cells to those three columns is what downstream
+analysis consumes; everything else in a Seurat object or AnnData file is
+carried along but not read.
+
+At the subject level, the analysis needs a non-negative count matrix.
+Each row is one subject, each column is one category, and entry
+$`c_{sk}`$ is the number of cells (or pre-aggregated count) assigned to
+category $`k`$ for subject $`s`$. If a subject has no cells in a
+category, the corresponding entry is zero rather than missing. Group
+membership is stored once per subject and must not vary across cells
+from the same subject, because enrichment compares between-group
+distances to within-group distances among subjects, not among cells.
+
+### Why bridge cell-level objects to subject-level counts?
+
+The scale transfer is deliberate. A typical single-cell dataset contains
+thousands or millions of cells but only a handful of biological
+replicates. Treating each cell as an independent observation would
+inflate replication and distort the null distribution of group
+differences. Aggregating to subjects collapses the cell-level
+multinomial into one frequency vector per donor, which is the unit at
+which group comparisons are defined.
+
+The container format does not change that aggregation. The extractor
+accepts Seurat `meta.data`, AnnData `obs`, or a plain `data.frame`,
+tabulates cells by subject and category (or sums a count column in a
+long table), and returns the same `CategoryComposition` structure. Once
+that object exists, the enrichment workflow is identical regardless of
+how the counts were produced. Object type is therefore an interface
+concern, not a statistical one.
+
+### How are columns named and validated?
+
+Column names in real pipelines rarely match package defaults, so
+[`ExtractClusterComposition()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ExtractClusterComposition.md)
+accepts explicit mappings: `subjectCol` for the donor or sample
+identifier, `categoryCol` for the cluster or cell-type label, and
+`groupCol` for the experimental condition. For pre-aggregated long
+tables, a fourth column `countCol` (default `"n"`) holds the raw counts.
+The function checks that required columns exist, coerces identifiers to
+character, and stops if any subject maps to more than one group.
+
+Counts must be non-negative, and the composition object does not permit
+`NA` in the count matrix; absent subject–category combinations are
+represented as zero. Inference via
+[`CompareGroupCompositions()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/CompareGroupCompositions.md)
+additionally requires at least two subjects per group so that
+within-group distances can be computed. These constraints are enforced
+at extraction or at comparison time depending on the failure mode, but
+the design intent is the same: subject-level replication with a single,
+unambiguous group label per subject.
+
+## Execution
+
+### Extract compositions from Seurat `meta.data`
+
+For Seurat objects,
+[`ExtractClusterComposition()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ExtractClusterComposition.md)
+reads the requested columns from `meta.data`, treats each row as one
+cell, and aggregates to subject-level counts. We build a minimal
+in-memory object so the extraction can run without a study-sized
+dataset; the expression matrix is present only because Seurat requires
+one, not because enrichment uses it.
+
+After extraction, `print(composition)` reports the number of subjects,
+categories, and groups. A short
+[`CompareGroupCompositions()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/CompareGroupCompositions.md)
+call with reduced permutations confirms that the returned object is a
+valid input to the enrichment workflow described in the companion
+vignette.
 
 ``` r
 
@@ -70,14 +149,16 @@ if (requireNamespace("Seurat", quietly = TRUE)) {
 #> [1] 0.4705882
 ```
 
-## anndata obs path
+### Extract compositions from anndata `obs`
 
-The anndata route is mechanically the same: cell-level fields live in
-`obs`, and the extractor aggregates them to subjects. Column names may
-differ across pipelines, so the `subjectCol`, `categoryCol`, and
-`groupCol` arguments must match the object at hand. Once those columns
-are identified, the resulting composition object is interchangeable with
-the Seurat-derived one.
+The AnnData approach is mechanically the same: cell-level fields live in
+`obs`, and the extractor delegates to the same `data.frame` aggregation
+after coercing `obs` to a table. Column names may differ from the Seurat
+example (`subjectId` versus `donor_id`, `category` versus `cell_type`),
+which is why the `subjectCol`, `categoryCol`, and `groupCol` arguments
+exist. Once those names are aligned with the object at hand, the
+resulting `CategoryComposition` is interchangeable with one derived from
+Seurat.
 
 ``` r
 
@@ -113,9 +194,69 @@ if (requireNamespace("anndata", quietly = TRUE)) {
 #> [1] 1
 ```
 
-The practical consequence is that object format need not dictate the
-enrichment workflow. Seurat and anndata are alternative containers for
-the same subject-category-group mapping. For HPC deployments, bind-mount
-study metadata at runtime rather than baking cohort files into container
-images; the extraction step then remains portable across environments
-while the cohort annotations stay outside the image layer.
+### Use a long counts table directly
+
+Not every workflow passes through a single-cell object. If counts are
+already aggregated—one row per subject–category combination with an
+explicit count column—a long `data.frame` is a first-class input. When
+all four columns (`subjectCol`, `categoryCol`, `groupCol`, `countCol`)
+are present,
+[`ExtractClusterComposition()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ExtractClusterComposition.md)
+detects the long-table format and sums duplicate subject–category rows
+rather than counting cells. The same table can be passed directly to
+[`CompareGroupCompositions()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/CompareGroupCompositions.md)
+without calling the extractor first, though extracting explicitly makes
+the subject×category matrix visible and attaches provenance metadata.
+
+This approach is useful when metadata were exported from a database,
+pseudobulked upstream, or assembled outside R. The statistical object on
+the other side is unchanged.
+
+``` r
+
+long_counts <- data.frame(
+  subjectId = rep(c("S1", "S2", "S3", "S4"), each = 3),
+  category = rep(paste0("Category", 0:2), 4),
+  group = rep(c("Control", "Control", "Case", "Case"), each = 3),
+  n = c(30, 30, 40, 35, 25, 40, 10, 20, 70, 15, 15, 70),
+  stringsAsFactors = FALSE
+)
+
+composition <- ExtractClusterComposition(long_counts)
+print(composition)
+#> CategoryComposition with 4 subjects, 3 categories, and 2 groups
+
+CompareGroupCompositions(
+  long_counts,
+  method = "permutation",
+  nPermutations = 50,
+  seed = 3
+)$omnibus
+#> $effectSize
+#> [1] 4.096028
+#> 
+#> $pValue
+#> [1] 0.3529412
+```
+
+### Deploy on HPC or in containers
+
+In production, cohort annotations often change faster than container
+images or batch job definitions. Embedding subject and group labels in
+an image layer couples the enrichment code to a specific study snapshot
+and complicates reruns when metadata are corrected. Providing metadata
+at runtime—as exported `meta.data`, `obs`, or a long counts CSV—keeps
+the extraction step portable while the cohort files remain outside the
+image.
+
+The extraction function depends only on whether the three (or four)
+columns validate, not on where the table originated. That separation
+allows the same Docker image or HPC module to serve multiple studies by
+swapping mounted metadata files, with `subjectCol` / `categoryCol` /
+`groupCol` adjusted per cohort as needed.
+
+Object format therefore does not dictate the enrichment workflow.
+Seurat, AnnData, and long tables are alternative inputs to the same
+`CategoryComposition` object. Once counts are at subject scale with one
+group per subject, the distance and inference steps in the Hellinger
+enrichment vignette apply without modification.

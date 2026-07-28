@@ -5,12 +5,12 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Hellinger enrichment on synthetic compositions • HellingerDistanceEnrichment</title>
+<title>Hellinger enrichment for subject-level compositions • HellingerDistanceEnrichment</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Hellinger enrichment on synthetic compositions">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Hellinger enrichment for subject-level compositions">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -33,7 +33,7 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/hellinger-enrichment.html">Hellinger enrichment on synthetic compositions</a></li>
+<li><a class="dropdown-item" href="../articles/hellinger-enrichment.html">Hellinger enrichment for subject-level compositions</a></li>
     <li><a class="dropdown-item" href="../articles/extract-metadata.html">Extracting compositions from Seurat and anndata</a></li>
   </ul>
 </li>
@@ -56,8 +56,9 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Hellinger enrichment on synthetic compositions</h1>
-                        <h4 data-toc-skip class="author">HellingerDistanceEnrichment</h4>
+      <h1>Hellinger enrichment for subject-level compositions</h1>
+                        <h4 data-toc-skip class="author">GW
+McElfresh</h4>
             
             <h4 data-toc-skip class="date">2026-07-28</h4>
       
@@ -68,23 +69,268 @@
     
     
 <p>Understanding whether categorical compositions differ between
-experimental groups is critical when cell-level clustering is summarized
-to subject-level frequencies. However, treating those frequencies as
-fixed points in a simplex ignores sampling variation in the estimated
-multinomial distribution. Effect size in this package is the mean
-between-group pairwise Hellinger distance divided by the mean
-within-group pairwise distance. Here, we walk through the
-<code>HellingerDistanceEnrichment</code> workflow on entirely synthetic
-data so that the inference path remains visible without cohort-specific
-noise.</p>
+experimental groups is critical when single-cell annotations are
+summarized to subject-level frequencies. However, the scale of inference
+is not the cell: it is the donor (or animal, or replicate) whose
+multinomial counts define a composition vector on a probability simplex.
+Cell-level cluster proportions can look sharply different while
+subject-level compositions remain exchangeable across groups, and the
+reverse can hold when sampling noise is large relative to an imposed
+enrichment. Real cohorts rarely reduce to a single pairwise comparison,
+so this vignette uses three groups: a Control, a Condition1 group with
+an imposed enrichment, and a Condition2 group that remains exchangeable
+with Control. Here, we illustrate
+<code>HellingerDistanceEnrichment</code> on that synthetic cohort,
+separating the conceptual framework (distance, ratio, contrasts,
+inference) from the executable workflow that recovers which comparisons
+carry signal.</p>
 <div class="section level2">
-<h2 id="build-a-synthetic-long-counts-table">Build a synthetic long counts table<a class="anchor" aria-label="anchor" href="#build-a-synthetic-long-counts-table"></a>
+<h2 id="concepts">Concepts<a class="anchor" aria-label="anchor" href="#concepts"></a>
 </h2>
-<p>We first construct a long count table with subject identifiers,
-category labels, group membership, and counts. A modest enrichment is
-then planted in the Treatment group for a single category. That planted
-structure is the known signal against which the permutation and Bayes
-procedures can be compared.</p>
+<div class="section level3">
+<h3 id="what-is-composition-enrichment">What is composition enrichment?<a class="anchor" aria-label="anchor" href="#what-is-composition-enrichment"></a>
+</h3>
+<p>Composition enrichment asks whether experimental groups occupy
+different regions of the simplex once cells have been aggregated to
+subjects. At the cell scale, each row carries a category label (cluster,
+cell type, module score bin) and metadata that links that cell to a
+subject and a group. At the subject scale, those labels become counts:
+for subject
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>
+and category
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>,
+we observe
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>c</mi><mrow><mi>s</mi><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">c_{sk}</annotation></semantics></math>
+cells (or events) in category
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>,
+and the subject’s composition is the normalized frequency vector
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>p</mi><mi>s</mi></msub><mo>=</mo><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mrow><mi>s</mi><mn>1</mn></mrow></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>c</mi><mrow><mi>s</mi><mi>K</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo><mi>/</mi><msub><mo>∑</mo><mi>k</mi></msub><msub><mi>c</mi><mrow><mi>s</mi><mi>k</mi></mrow></msub></mrow><annotation encoding="application/x-tex">p_s = (c_{s1}, \ldots, c_{sK}) / \sum_k c_{sk}</annotation></semantics></math>.</p>
+<p>The scientific question is relational rather than descriptive. We are
+not asking which category is most abundant in one subject; we are asking
+whether between-group compositional distance exceeds within-group
+compositional distance across subjects. That framing mirrors
+pseudobulking in expression analysis: many cells collapse to one
+replicate-level observation, and hypothesis tests must respect the
+replicate as the unit of inference. A cluster that is enriched at the
+cell level within a single subject does not, by itself, establish
+group-level enrichment, because one subject’s multinomial draw can
+dominate the apparent pattern.</p>
+<p>This package tests enrichment by comparing mean pairwise Hellinger
+distances among subjects in different groups to mean pairwise distances
+among subjects in the same group. The output is an effect-size ratio
+together with permutation or posterior-predictive p-values, optionally
+decomposed into omnibus and contrast-specific summaries.</p>
+</div>
+<div class="section level3">
+<h3 id="why-hellinger-distance">Why Hellinger distance?<a class="anchor" aria-label="anchor" href="#why-hellinger-distance"></a>
+</h3>
+<p>Once counts are normalized to frequencies, compositions live on a
+simplex, and Euclidean distance on raw proportions is a poor geometry:
+scaling one category compresses the others, and small zeros carry
+disproportionate weight. Hellinger distance measures separation between
+two frequency vectors
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math>
+by comparing their square roots:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>H</mi><mo stretchy="false" form="prefix">(</mo><mi>p</mi><mo>,</mo><mi>q</mi><mo stretchy="false" form="postfix">)</mo><mo>=</mo><mfrac><mn>1</mn><msqrt><mn>2</mn></msqrt></mfrac><msub><mrow><mo stretchy="true" form="prefix">∥</mo><msqrt><mi>p</mi></msqrt><mo>−</mo><msqrt><mi>q</mi></msqrt><mo stretchy="true" form="postfix">∥</mo></mrow><mn>2</mn></msub><mo>∈</mo><mo stretchy="false" form="prefix">[</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo stretchy="false" form="postfix">]</mo><mi>.</mi></mrow><annotation encoding="application/x-tex">
+H(p,q)=\frac{1}{\sqrt{2}}\left\lVert\sqrt{p}-\sqrt{q}\right\rVert_2 \in [0,1].
+</annotation></semantics></math></p>
+<p>Values near 0 indicate similar compositions; values near 1 indicate
+near-disjoint support. The implementation computes
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math>
+from count vectors by forming frequencies internally, so the distance is
+always taken on normalized compositions rather than raw counts.</p>
+<p>Sparse categories create a second problem: empirical frequencies of
+zero are not credible endpoints when counts are small. Before distances
+are evaluated, counts are softened with a Jeffreys-style pseudocount.
+For subject
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>,
+category
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>,
+and default
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>α</mi><mo>=</mo><mn>1</mn><mi>/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\alpha = 1/2</annotation></semantics></math>,</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mover><mi>c</mi><mo accent="true">̃</mo></mover><mrow><mi>s</mi><mi>k</mi></mrow></msub><mo>=</mo><msub><mi>c</mi><mrow><mi>s</mi><mi>k</mi></mrow></msub><mo>+</mo><mi>α</mi><mo>,</mo><mspace width="2.0em"></mspace><msub><mi>p</mi><mrow><mi>s</mi><mi>k</mi></mrow></msub><mo>=</mo><mfrac><msub><mover><mi>c</mi><mo accent="true">̃</mo></mover><mrow><mi>s</mi><mi>k</mi></mrow></msub><mrow><munder><mo>∑</mo><mi>j</mi></munder><msub><mover><mi>c</mi><mo accent="true">̃</mo></mover><mrow><mi>s</mi><mi>j</mi></mrow></msub></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+\tilde{c}_{sk} = c_{sk} + \alpha, \qquad
+p_{sk} = \frac{\tilde{c}_{sk}}{\sum_j \tilde{c}_{sj}}.
+</annotation></semantics></math></p>
+<p>The default <code>priorPseudocounts = 1/2</code> matches the
+conjugate Dirichlet prior used in the Bayesian approach. Softening pulls
+extreme proportions toward the simplex center and stabilizes pairwise
+distances when some categories are rarely observed.</p>
+<p>Hellinger distance is appropriate for asking whether compositions are
+separable in frequency space. It does not, by itself, identify which
+category drives a contrast, establish causality, or correct for
+differences in total cell yield between subjects beyond what is encoded
+in the normalized frequencies. Biological interpretation still requires
+knowing what the categories represent and whether the aggregation level
+matches the experimental question.</p>
+</div>
+<div class="section level3">
+<h3 id="what-is-the-enrichment-ratio">What is the enrichment ratio?<a class="anchor" aria-label="anchor" href="#what-is-the-enrichment-ratio"></a>
+</h3>
+<p>Given a subjects-by-categories count matrix, the package builds a
+symmetric subject-level Hellinger distance matrix
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>D</mi><annotation encoding="application/x-tex">D</annotation></semantics></math>,
+where
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mrow><mi>s</mi><msup><mi>s</mi><mo>′</mo></msup></mrow></msub><mo>=</mo><mi>H</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>p</mi><mi>s</mi></msub><mo>,</mo><msub><mi>p</mi><msup><mi>s</mi><mo>′</mo></msup></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">D_{ss'} = H(p_s, p_{s'})</annotation></semantics></math>
+using softened, normalized compositions. Subjects are then grouped by
+experimental label
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>.
+For each group pair
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>g</mi><mo>,</mo><msup><mi>g</mi><mo>′</mo></msup><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(g, g')</annotation></semantics></math>,
+the package summarizes distances as mean pairwise Hellinger distance
+within or between subject sets:</p>
+<ul>
+<li>
+<strong>Within-group</strong> (diagonal of the group summary): mean
+of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>D</mi><mrow><mi>s</mi><msup><mi>s</mi><mo>′</mo></msup></mrow></msub><annotation encoding="application/x-tex">D_{ss'}</annotation></semantics></math>
+for subjects
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>s</mi><mo>,</mo><msup><mi>s</mi><mo>′</mo></msup></mrow><annotation encoding="application/x-tex">s, s'</annotation></semantics></math>
+both in group
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>.</li>
+<li>
+<strong>Between-group</strong> (off-diagonal): mean of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>D</mi><mrow><mi>s</mi><msup><mi>s</mi><mo>′</mo></msup></mrow></msub><annotation encoding="application/x-tex">D_{ss'}</annotation></semantics></math>
+for subjects
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>
+in group
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msup><mi>s</mi><mo>′</mo></msup><annotation encoding="application/x-tex">s'</annotation></semantics></math>
+in group
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msup><mi>g</mi><mo>′</mo></msup><annotation encoding="application/x-tex">g'</annotation></semantics></math>.</li>
+</ul>
+<p>The enrichment effect size is the ratio of average between-group
+distance to average within-group distance:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>=</mo><mfrac><msub><mover><mi>H</mi><mo accent="true">¯</mo></mover><mrow><mi mathvariant="normal">b</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">w</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">n</mi></mrow></msub><msub><mover><mi>H</mi><mo accent="true">¯</mo></mover><mrow><mi mathvariant="normal">w</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">t</mi><mi mathvariant="normal">h</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">n</mi></mrow></msub></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+R=\frac{\overline{H}_{\mathrm{between}}}{\overline{H}_{\mathrm{within}}}.
+</annotation></semantics></math></p>
+<p>When
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>,
+subjects in different groups are farther apart, on average, than
+subjects within the same group under this metric. When
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>≈</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R \approx 1</annotation></semantics></math>,
+group labels are consistent with exchangeable compositions relative to
+the observed within-group dispersion. The ratio is defined over pairwise
+subject distances, so each group must contribute at least two subjects;
+otherwise within-group means are not identifiable and inference stops
+with an error.</p>
+<p>This ratio is the test statistic for both permutation and Bayes
+methods. It compresses a full distance matrix into a single scale-free
+quantity that can be compared across contrasts and simulation draws.</p>
+</div>
+<div class="section level3">
+<h3 id="what-is-a-contrast">What is a contrast?<a class="anchor" aria-label="anchor" href="#what-is-a-contrast"></a>
+</h3>
+<p>A contrast is a specified comparison among group labels on which
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+is evaluated. The package always computes an <strong>omnibus</strong>
+contrast that includes all group levels present in the composition
+object. For
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>G</mi><annotation encoding="application/x-tex">G</annotation></semantics></math>
+groups, it also computes all <strong>pairwise</strong> contrasts
+(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mi>G</mi><mn>2</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\binom{G}{2}</annotation></semantics></math>
+comparisons) unless additional custom specifications are supplied.</p>
+<p>The analogy to differential expression is deliberate but not exact.
+In DE, a contrast selects linear combinations of model coefficients on
+log-expression. Here, a contrast selects which subjects enter the
+between/within distance summaries—either all groups (omnibus), a pair of
+groups (subset), or a remapped grouping (collapse). Custom contrasts are
+passed as a <strong>named list</strong> to <code>contrasts=</code>;
+names become <code>contrastId</code> values in the result.</p>
+<p>Two levels of p-value reporting matter in practice:</p>
+<ul>
+<li>
+<strong><code>result$omnibus$pValue</code></strong>: unadjusted
+p-value for the global between/within ratio across all groups.</li>
+<li>
+<strong><code>result$contrasts$pValue</code> and
+<code>pAdj</code></strong>: contrast-specific p-values, with
+<code>pAdj</code> applying Holm adjustment across the contrast table by
+default (<code>pAdjustMethod = "holm"</code>).</li>
+</ul>
+<p>Omnibus and pairwise contrasts therefore answer nested questions. A
+significant omnibus result indicates that at least some group separation
+exists under the ratio metric; pairwise contrasts localize that
+separation, with multiplicity control on the contrast table rather than
+on the omnibus line.</p>
+</div>
+<div class="section level3">
+<h3 id="permutation-vs-bayes-related-but-non-equivalent-questions">Permutation vs Bayes: related but non-equivalent questions<a class="anchor" aria-label="anchor" href="#permutation-vs-bayes-related-but-non-equivalent-questions"></a>
+</h3>
+<p>Both methods use label shuffling to define a null, but they differ in
+whether composition vectors are treated as fixed.</p>
+<p><strong>Permutation (<code>method = "permutation"</code>).</strong>
+Compositions are estimated once from softened counts, fixing the subject
+distance matrix. Group labels are permuted among subjects
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
+times (<code>nPermutations</code>), and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+is recomputed on each shuffle. The one-sided p-value includes the
+observed statistic in the numerator:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>p</mi><mo>=</mo><mfrac><mrow><mi>#</mi><mo stretchy="false" form="prefix">{</mo><msub><mi>R</mi><mrow><mi mathvariant="normal">p</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">m</mi></mrow></msub><mo>≥</mo><msub><mi>R</mi><mrow><mi mathvariant="normal">o</mi><mi mathvariant="normal">b</mi><mi mathvariant="normal">s</mi></mrow></msub><mo stretchy="false" form="postfix">}</mo><mo>+</mo><mn>1</mn></mrow><mrow><mi>B</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
+p=\frac{\#\{R_{\mathrm{perm}}\ge R_{\mathrm{obs}}\}+1}{B+1}.
+</annotation></semantics></math></p>
+<p>This tests whether group labels are exchangeable
+<strong>given</strong> the estimated compositions. It does not propagate
+uncertainty in the multinomial allocation of cells to categories.</p>
+<p><strong>Bayes (<code>method = "bayes"</code>).</strong> For each
+posterior draw, subject compositions are sampled from a conjugate
+Dirichlet posterior. With Jeffreys increment
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>,</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>p</mi><mi>s</mi></msub><mo>∼</mo><mrow><mi mathvariant="normal">D</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">h</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi></mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mrow><mi>s</mi><mo>⋅</mo></mrow></msub><mo>+</mo><mi>α</mi><mo stretchy="false" form="postfix">)</mo><mo>,</mo></mrow><annotation encoding="application/x-tex">
+p_s \sim \mathrm{Dirichlet}(c_{s\cdot} + \alpha),
+</annotation></semantics></math></p>
+<p>where
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>c</mi><mrow><mi>s</mi><mo>⋅</mo></mrow></msub><annotation encoding="application/x-tex">c_{s\cdot}</annotation></semantics></math>
+is the count vector for subject
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>.
+A full Hellinger distance matrix is rebuilt from that draw, and a nested
+permutation null (same label shuffles, <code>nPermutations</code> per
+draw) yields
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+and a draw-specific p-value. Across <code>nPosterior</code> draws, the
+package reports:</p>
+<ul>
+<li>posterior-mean
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+(<code>effectSize</code>),</li>
+<li>posterior-mean p-value (<code>pValue</code>),</li>
+<li>95% credible interval on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+(<code>effectCiLow</code>, <code>effectCiHigh</code>).</li>
+</ul>
+<p>The Bayesian approach therefore nests composition uncertainty inside
+the label-exchange null. When counts are sparse, that nesting can widen
+credible intervals or inflate mean p-values relative to plain
+permutation, even when point ratios look similar. When counts are dense
+and the imposed enrichment is strong—as in the synthetic example
+below—the two approaches often agree on which contrasts are elevated,
+though they still answer formally different questions.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="execution">Execution<a class="anchor" aria-label="anchor" href="#execution"></a>
+</h2>
+<div class="section level3">
+<h3 id="build-a-synthetic-long-counts-table">Build a synthetic long counts table<a class="anchor" aria-label="anchor" href="#build-a-synthetic-long-counts-table"></a>
+</h3>
+<p>We begin with a known enrichment structure. A synthetic long table
+carries one row per subject–category combination with columns
+<code>subjectId</code>, <code>category</code>, <code>group</code>, and
+<code>n</code>, matching the package’s default long-table schema.
+Subjects are drawn from a multinomial allocation within each group so
+that, before enrichment is imposed, Control, Condition1, and Condition2
+are approximately exchangeable. We then multiply counts in
+<code>Condition1</code> for <code>Category0</code> by a fixed factor,
+introducing a modest, known enrichment in that group alone. Condition2
+is left unmodified, so its compositions remain exchangeable with Control
+under the generating process.</p>
+<p>The internal functions <code>build_synthetic_long_table()</code> and
+<code>plant_group_structure()</code> live in the package namespace for
+vignette and test use; they are not exported, but they provide a
+reproducible procedure for simulating compositional cohorts.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gwmcelfresh.github.io/HellingerDistanceEnrichment/">HellingerDistanceEnrichment</a></span><span class="op">)</span></span>
 <span></span>
@@ -92,14 +338,13 @@ procedures can be compared.</p>
 <span><span class="va">long_table</span> <span class="op">&lt;-</span> <span class="fu">HellingerDistanceEnrichment</span><span class="fu">:::</span><span class="fu">build_synthetic_long_table</span><span class="op">(</span></span>
 <span>  n_subjects_per_group <span class="op">=</span> <span class="fl">6</span>,</span>
 <span>  n_categories <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Treatment"</span><span class="op">)</span>,</span>
+<span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Condition1"</span>, <span class="st">"Condition2"</span><span class="op">)</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">2026</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="co"># Plant a modest enrichment in Treatment for one category.</span></span>
 <span><span class="va">long_table</span> <span class="op">&lt;-</span> <span class="fu">HellingerDistanceEnrichment</span><span class="fu">:::</span><span class="fu">plant_group_structure</span><span class="op">(</span></span>
 <span>  <span class="va">long_table</span>,</span>
-<span>  target_group <span class="op">=</span> <span class="st">"Treatment"</span>,</span>
+<span>  target_group <span class="op">=</span> <span class="st">"Condition1"</span>,</span>
 <span>  target_category <span class="op">=</span> <span class="st">"Category0"</span>,</span>
 <span>  boost <span class="op">=</span> <span class="fl">4</span></span>
 <span><span class="op">)</span></span>
@@ -111,20 +356,35 @@ procedures can be compared.</p>
 <span><span class="co">#&gt; 3 Control_S01 Category2 Control 15</span></span>
 <span><span class="co">#&gt; 4 Control_S01 Category3 Control 20</span></span>
 <span><span class="co">#&gt; 5 Control_S01 Category4 Control 23</span></span>
-<span><span class="co">#&gt; 6 Control_S02 Category0 Control 20</span></span></code></pre></div>
+<span><span class="co">#&gt; 6 Control_S02 Category0 Control 20</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">long_table</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"subjectId"</span>, <span class="st">"group"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span><span class="op">$</span><span class="va">group</span><span class="op">)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Condition1 Condition2    Control </span></span>
+<span><span class="co">#&gt;          6          6          6</span></span></code></pre></div>
+<p>Inspecting the head of the table confirms the long format: each
+subject contributes
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>
+rows (one per category), and the imposed enrichment appears as larger
+<code>n</code> in <code>Condition1</code> for <code>Category0</code>
+only. The subject–group table should show six subjects in each of the
+three groups.</p>
 </div>
-<div class="section level2">
-<h2 id="extract-and-compare-compositions">Extract and compare compositions<a class="anchor" aria-label="anchor" href="#extract-and-compare-compositions"></a>
-</h2>
-<p><code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> aggregates the long table
-into a subject-by-category count matrix with a group factor.
-<code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code> then returns an omnibus contrast
-together with pairwise group contrasts. The permutation method shuffles
-group labels while holding the estimated compositions fixed, which tests
-whether the observed between-to-within distance ratio is large relative
-to a label-exchange null.</p>
+<div class="section level3">
+<h3 id="extract-compositions-and-run-permutation-inference">Extract compositions and run permutation inference<a class="anchor" aria-label="anchor" href="#extract-compositions-and-run-permutation-inference"></a>
+</h3>
+<p>The long table is aggregated to a <code>CategoryComposition</code>
+object: a subjects-by-categories count matrix with a named group factor.
+<code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> performs that coercion and
+records provenance; missing subject–category combinations are
+zero-filled.</p>
+<p><code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code> accepts either a
+<code>CategoryComposition</code> or a long table directly. Here we
+extract explicitly so the subject-scale object is visible before
+inference.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">composition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition</a></span><span class="op">(</span><span class="va">long_table</span><span class="op">)</span></span>
+<span><span class="va">composition</span></span>
+<span><span class="co">#&gt; CategoryComposition with 18 subjects, 5 categories, and 3 groups</span></span>
 <span></span>
 <span><span class="va">perm_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions</a></span><span class="op">(</span></span>
 <span>  <span class="va">composition</span>,</span>
@@ -134,13 +394,83 @@ to a label-exchange null.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">perm_result</span></span>
-<span><span class="co">#&gt; HellingerEnrichmentResult (permutation): omnibus effectSize=2.1878, pValue=0.0050</span></span>
-<span><span class="co">#&gt;   1 contrast(s) tested</span></span></code></pre></div>
-<p>The Bayes path samples subject-level compositions from a conjugate
-Dirichlet posterior and, at each draw, runs a full permutation null. In
-this vignette the posterior and permutation counts are kept small for
-runtime; production analyses should increase both.</p>
+<span><span class="co">#&gt; HellingerEnrichmentResult (permutation): omnibus effectSize=1.8248, pValue=0.0050</span></span>
+<span><span class="co">#&gt;   3 contrast(s) tested</span></span>
+<span><span class="va">perm_result</span><span class="op">$</span><span class="va">omnibus</span></span>
+<span><span class="co">#&gt; $effectSize</span></span>
+<span><span class="co">#&gt; [1] 1.824822</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $pValue</span></span>
+<span><span class="co">#&gt; [1] 0.004975124</span></span>
+<span><span class="va">perm_result</span><span class="op">$</span><span class="va">contrasts</span></span>
+<span><span class="co">#&gt;                 contrastId effectSize      pValue       pAdj</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2   2.107850 0.004975124 0.01492537</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control   2.187775 0.004975124 0.01492537</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control   1.173828 0.049751244 0.04975124</span></span></code></pre></div>
+<p>The printed <code>HellingerEnrichmentResult</code> summarizes the
+omnibus ratio and p-value. <code>perm_result$omnibus</code> holds the
+global effect size and unadjusted p-value;
+<code>perm_result$contrasts</code> holds all three pairwise contrasts
+with Holm-adjusted <code>pAdj</code> columns. Pairwise
+<code>contrastId</code> values follow sorted group-level order
+(<code>Condition1_vs_Control</code>,
+<code>Condition1_vs_Condition2</code>,
+<code>Condition2_vs_Control</code>). For the imposed enrichment, we
+expect <code>omnibus$effectSize &gt; 1</code> and a small omnibus
+p-value, with <code>Condition1_vs_Control</code> (and often
+<code>Condition1_vs_Condition2</code>) carrying the enrichment, while
+<code>Condition2_vs_Control</code> remains near exchangeability
+(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>≈</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R \approx 1</annotation></semantics></math>,
+large p-values).</p>
+</div>
+<div class="section level3">
+<h3 id="custom-contrasts-and-optional-collapse">Custom contrasts (and optional collapse)<a class="anchor" aria-label="anchor" href="#custom-contrasts-and-optional-collapse"></a>
+</h3>
+<p>Default output already includes all pairwise contrasts. Custom
+entries in <code>contrasts=</code> add named specifications on top of
+that default set: a length-2 character vector selects a subset pairwise
+comparison, while a list with <code>groups</code> and/or
+<code>collapse</code> remaps or restricts group levels before distances
+are computed. With three groups, a natural custom specification names
+the two scientifically primary comparisons—enriched versus Control, and
+the unmodified group versus Control—under stable identifiers for
+downstream tables.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">perm_custom</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions</a></span><span class="op">(</span></span>
+<span>  <span class="va">composition</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"permutation"</span>,</span>
+<span>  nPermutations <span class="op">=</span> <span class="fl">200</span>,</span>
+<span>  contrasts <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    condition1_vs_control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Condition1"</span><span class="op">)</span>,</span>
+<span>    condition2_vs_control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Condition2"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">42</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">perm_custom</span><span class="op">$</span><span class="va">contrasts</span></span>
+<span><span class="co">#&gt;                 contrastId effectSize      pValue       pAdj</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2   2.107850 0.004975124 0.02487562</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control   2.187775 0.004975124 0.02487562</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control   1.173828 0.049751244 0.09950249</span></span>
+<span><span class="co">#&gt; 5    condition1_vs_control   2.187775 0.004975124 0.02487562</span></span>
+<span><span class="co">#&gt; 6    condition2_vs_control   1.173828 0.049751244 0.09950249</span></span></code></pre></div>
+<p>The named contrasts reproduce those pairwise comparisons under
+user-chosen identifiers—useful when contrast tables are merged across
+analyses. Collapse becomes essential when experimental groups are
+relabeled for analysis (for example, merging dose cohorts into a single
+treated group) without rebuilding the count matrix by hand; see
+<code><a href="../reference/CompareGroupCompositions.html">?CompareGroupCompositions</a></code> for the <code>collapse</code>
+argument.</p>
+</div>
+<div class="section level3">
+<h3 id="bayesian-approach">Bayesian approach<a class="anchor" aria-label="anchor" href="#bayesian-approach"></a>
+</h3>
+<p>The Bayesian method reuses the same contrast specifications but
+replaces fixed compositions with Dirichlet posterior draws. For vignette
+execution time, keep <code>nPosterior</code> and
+<code>nPermutations</code> small; production analyses should raise both
+so posterior means and intervals stabilize.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bayes_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions</a></span><span class="op">(</span></span>
 <span>  <span class="va">composition</span>,</span>
 <span>  method <span class="op">=</span> <span class="st">"bayes"</span>,</span>
@@ -151,48 +481,107 @@ runtime; production analyses should increase both.</p>
 <span></span>
 <span><span class="va">bayes_result</span><span class="op">$</span><span class="va">omnibus</span></span>
 <span><span class="co">#&gt; $effectSize</span></span>
-<span><span class="co">#&gt; [1] 1.843022</span></span>
+<span><span class="co">#&gt; [1] 1.515218</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $pValue</span></span>
-<span><span class="co">#&gt; [1] 0.02156863</span></span>
+<span><span class="co">#&gt; [1] 0.01960784</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $effectCiLow</span></span>
-<span><span class="co">#&gt; [1] 1.554202</span></span>
+<span><span class="co">#&gt; [1] 1.329332</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $effectCiHigh</span></span>
-<span><span class="co">#&gt; [1] 2.152769</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 1.767033</span></span>
+<span><span class="va">bayes_result</span><span class="op">$</span><span class="va">contrasts</span></span>
+<span><span class="co">#&gt;                 contrastId effectSize     pValue effectCiLow effectCiHigh</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2   1.689622 0.02352941   1.4613561     1.984081</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control   1.798434 0.02254902   1.4917787     1.975221</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control   1.115472 0.19705882   0.9561683     1.303130</span></span>
+<span><span class="co">#&gt;         pAdj</span></span>
+<span><span class="co">#&gt; 2 0.06764706</span></span>
+<span><span class="co">#&gt; 3 0.06764706</span></span>
+<span><span class="co">#&gt; 4 0.19705882</span></span></code></pre></div>
+<p>Interpretation differs slightly from permutation output.
+<code>bayes_result$omnibus$effectSize</code> is the posterior mean of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
+not the single observed ratio at the softened point estimate. The
+interval <code>effectCiLow</code>–<code>effectCiHigh</code> communicates
+whether
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>
+remains stable under composition uncertainty. When the credible interval
+excludes 1, enrichment is supported even if the posterior-mean p-value
+is moderated by label shuffling within each draw. When the interval
+spans 1 but permutation p-values are small, sparse counts may be driving
+a fixed-composition signal that the Bayesian procedure correctly
+weakens.</p>
 </div>
-<div class="section level2">
-<h2 id="plot-contrasts">Plot contrasts<a class="anchor" aria-label="anchor" href="#plot-contrasts"></a>
-</h2>
-<p>The permutation panel marks significance against the label-shuffle
-null. The Bayes panel shows posterior-mean effect sizes with 95%
-intervals, so composition uncertainty and group-label uncertainty appear
-on the same display.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="section level3">
+<h3 id="plot-contrasts">Plot contrasts<a class="anchor" aria-label="anchor" href="#plot-contrasts"></a>
+</h3>
+<p><code><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts()</a></code> visualizes contrast-level
+effect sizes. A dotted vertical line at
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R = 1</annotation></semantics></math>
+marks the exchangeability reference under this metric. When
+<code>showOmnibus = TRUE</code> (default), the omnibus posterior-mean or
+observed ratio appears as a dashed reference with its p-value
+annotated—contrasts can then be read against both unity and the global
+summary.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts</a></span><span class="op">(</span><span class="va">perm_result</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="hellinger-enrichment_files/figure-html/plot-perm-1.png" class="r-plt" alt="Permutation contrast panel with omnibus reference." width="672"><p class="caption">
 Permutation contrast panel with omnibus reference.
 </p>
 </div>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<p>For permutation results, points are colored by whether Holm-adjusted
+<code>pAdj &lt; 0.05</code>. For Bayes results, <code>ggdist</code>
+intervals show 95% credible ranges on each contrast’s
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts</a></span><span class="op">(</span><span class="va">bayes_result</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
 <img src="hellinger-enrichment_files/figure-html/plot-bayes-1.png" class="r-plt" alt="Bayesian posterior-mean contrasts with 95% intervals." width="672"><p class="caption">
 Bayesian posterior-mean contrasts with 95% intervals.
 </p>
 </div>
-<p>The two methods therefore answer related but non-equivalent
-questions. Plain permutation asks whether group labels are exchangeable
-given fixed composition estimates. The posterior-predictive Bayes path
-nests composition uncertainty inside that same label null, which the
-plain permutation test does not account for. When category counts are
-sparse, that nesting can change which contrasts appear stable. The
-synthetic enrichment used here is strong enough that both paths recover
-the planted structure; real cohorts will often require the Bayes path to
-decide whether an apparent contrast survives sampling variation in the
-compositions themselves.</p>
+<p>The two panels therefore display the same ratio scale with
+method-appropriate uncertainty. Permutation emphasizes discrete
+significance against the label null; Bayes overlays composition
+uncertainty on that same null.</p>
+</div>
+<div class="section level3">
+<h3 id="closing-interpretation">Closing interpretation<a class="anchor" aria-label="anchor" href="#closing-interpretation"></a>
+</h3>
+<p>On the synthetic cohort, both approaches should recover the imposed
+<code>Condition1</code> enrichment in <code>Category0</code>: omnibus
+and <code>Condition1_vs_Control</code> ratios above 1, with permutation
+p-values and Bayesian intervals consistent with a real between-group
+shift rather than label noise. The <code>Condition2_vs_Control</code>
+contrast should remain near
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>≈</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R \approx 1</annotation></semantics></math>,
+illustrating that a significant omnibus result does not imply every
+pairwise group differs from Control. That pattern is expected here
+because the enrichment factor is large relative to multinomial sampling
+noise, Condition2 was never modified, and every subject contributes
+moderately dense counts across five categories.</p>
+<p>The result does not generalize to all real cohorts. Sparse
+categories, unequal cell yields, or violated exchangeability (for
+example, batch confounded with group) can produce ratios that look
+enriched under fixed compositions but fail to hold once Dirichlet
+uncertainty is propagated. In those settings, the Bayesian approach is
+the more conservative assessment of whether an apparent contrast
+survives sampling variation in the compositions themselves.</p>
+<p>Two practical constraints bound any analysis. First, each group must
+include at least two subjects, because within-group distances are
+defined from pairwise comparisons. Second, each subject must map to
+exactly one experimental group in the metadata; conflicting group labels
+for the same subject are rejected at composition build time. Within
+those constraints, the workflow—long counts, subject composition,
+contrast specification, ratio-based inference, and contrast
+plotting—extends from this synthetic example to real
+<code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> inputs without changing the
+inferential definition of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
+</div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

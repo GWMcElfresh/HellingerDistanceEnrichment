@@ -14,7 +14,7 @@ Vignettes are published with pkgdown:
 
 <https://gwmcelfresh.github.io/HellingerDistanceEnrichment/>
 
-- [Hellinger enrichment on synthetic
+- [Hellinger enrichment for subject-level
   compositions](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/hellinger-enrichment.html)
 - [Extracting compositions from Seurat and
   anndata](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/extract-metadata.html)

@@ -5,12 +5,12 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>Extracting compositions from Seurat and anndata metadata • HellingerDistanceEnrichment</title>
+<title>Extracting compositions from Seurat and anndata • HellingerDistanceEnrichment</title>
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="../deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
-<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Extracting compositions from Seurat and anndata metadata">
+<script src="../deps/headroom-0.11.0/headroom.min.js"></script><script src="../deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="../deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="../deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="../deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="../deps/search-1.0.0/fuse.min.js"></script><script src="../deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Extracting compositions from Seurat and anndata">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -33,7 +33,7 @@
 <li class="active nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="../articles/hellinger-enrichment.html">Hellinger enrichment on synthetic compositions</a></li>
+<li><a class="dropdown-item" href="../articles/hellinger-enrichment.html">Hellinger enrichment for subject-level compositions</a></li>
     <li><a class="dropdown-item" href="../articles/extract-metadata.html">Extracting compositions from Seurat and anndata</a></li>
   </ul>
 </li>
@@ -56,8 +56,9 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
 
-      <h1>Extracting compositions from Seurat and anndata metadata</h1>
-                        <h4 data-toc-skip class="author">HellingerDistanceEnrichment</h4>
+      <h1>Extracting compositions from Seurat and anndata</h1>
+                        <h4 data-toc-skip class="author">GW
+McElfresh</h4>
             
             <h4 data-toc-skip class="date">2026-07-28</h4>
       
@@ -67,23 +68,106 @@
 
     
     
-<p>Single-cell workflows store the annotations needed for composition
-analysis at the cell level, while Hellinger enrichment operates on
-subject-level category counts. Bridging those scales depends on metadata
-columns that map each cell to a subject, a category (cluster or cell
-type), and an experimental group. This vignette builds tiny synthetic
-Seurat and anndata objects in memory and shows that both routes produce
-the same <code>CategoryComposition</code> input used by
-<code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code>.</p>
+<p>Single-cell pipelines store the annotations that define a composition
+at the cell level, while Hellinger enrichment operates on subject-level
+category counts. The gap between those scales is not a modeling choice;
+it is a bookkeeping step that must be correct before any distance or
+permutation test runs. Expression assays, normalized layers, and
+gene-level matrices are irrelevant to this step. What matters is whether
+each cell can be assigned to a subject, a categorical label (cluster,
+cell type, or other partition), and an experimental group that is
+constant for that subject.</p>
+<p>Here, we show how <code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> bridges
+common single-cell containers to the <code>CategoryComposition</code>
+object used by <code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code>. The companion
+vignette on Hellinger enrichment covers the distance metric, enrichment
+ratio, and inference methods; this article focuses on getting the count
+table right.</p>
 <div class="section level2">
-<h2 id="seurat-metadata-path">Seurat metadata path<a class="anchor" aria-label="anchor" href="#seurat-metadata-path"></a>
+<h2 id="concepts">Concepts<a class="anchor" aria-label="anchor" href="#concepts"></a>
 </h2>
-<p>For a Seurat object, <code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> reads
-the requested columns from <code>meta.data</code>, aggregates cells to
-subjects, and returns the composition object. Expression counts are
-irrelevant to the enrichment step; only the metadata mapping matters.
-The example below creates a minimal object so the extraction path can be
-run without a study-sized dataset.</p>
+<div class="section level3">
+<h3 id="what-metadata-does-enrichment-need">What metadata does enrichment need?<a class="anchor" aria-label="anchor" href="#what-metadata-does-enrichment-need"></a>
+</h3>
+<p>Composition enrichment asks whether experimental groups differ in how
+subjects distribute cells across categories. That question is defined
+entirely by three metadata fields per cell: which subject the cell came
+from, which category it belongs to, and which group that subject is in.
+The mapping from cells to those three columns is what downstream
+analysis consumes; everything else in a Seurat object or AnnData file is
+carried along but not read.</p>
+<p>At the subject level, the analysis needs a non-negative count matrix.
+Each row is one subject, each column is one category, and entry
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>c</mi><mrow><mi>s</mi><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">c_{sk}</annotation></semantics></math>
+is the number of cells (or pre-aggregated count) assigned to category
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
+for subject
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>.
+If a subject has no cells in a category, the corresponding entry is zero
+rather than missing. Group membership is stored once per subject and
+must not vary across cells from the same subject, because enrichment
+compares between-group distances to within-group distances among
+subjects, not among cells.</p>
+</div>
+<div class="section level3">
+<h3 id="why-bridge-cell-level-objects-to-subject-level-counts">Why bridge cell-level objects to subject-level counts?<a class="anchor" aria-label="anchor" href="#why-bridge-cell-level-objects-to-subject-level-counts"></a>
+</h3>
+<p>The scale transfer is deliberate. A typical single-cell dataset
+contains thousands or millions of cells but only a handful of biological
+replicates. Treating each cell as an independent observation would
+inflate replication and distort the null distribution of group
+differences. Aggregating to subjects collapses the cell-level
+multinomial into one frequency vector per donor, which is the unit at
+which group comparisons are defined.</p>
+<p>The container format does not change that aggregation. The extractor
+accepts Seurat <code>meta.data</code>, AnnData <code>obs</code>, or a
+plain <code>data.frame</code>, tabulates cells by subject and category
+(or sums a count column in a long table), and returns the same
+<code>CategoryComposition</code> structure. Once that object exists, the
+enrichment workflow is identical regardless of how the counts were
+produced. Object type is therefore an interface concern, not a
+statistical one.</p>
+</div>
+<div class="section level3">
+<h3 id="how-are-columns-named-and-validated">How are columns named and validated?<a class="anchor" aria-label="anchor" href="#how-are-columns-named-and-validated"></a>
+</h3>
+<p>Column names in real pipelines rarely match package defaults, so
+<code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> accepts explicit mappings:
+<code>subjectCol</code> for the donor or sample identifier,
+<code>categoryCol</code> for the cluster or cell-type label, and
+<code>groupCol</code> for the experimental condition. For pre-aggregated
+long tables, a fourth column <code>countCol</code> (default
+<code>"n"</code>) holds the raw counts. The function checks that
+required columns exist, coerces identifiers to character, and stops if
+any subject maps to more than one group.</p>
+<p>Counts must be non-negative, and the composition object does not
+permit <code>NA</code> in the count matrix; absent subject–category
+combinations are represented as zero. Inference via
+<code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code> additionally requires at least
+two subjects per group so that within-group distances can be computed.
+These constraints are enforced at extraction or at comparison time
+depending on the failure mode, but the design intent is the same:
+subject-level replication with a single, unambiguous group label per
+subject.</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="execution">Execution<a class="anchor" aria-label="anchor" href="#execution"></a>
+</h2>
+<div class="section level3">
+<h3 id="extract-compositions-from-seurat-meta-data">Extract compositions from Seurat <code>meta.data</code><a class="anchor" aria-label="anchor" href="#extract-compositions-from-seurat-meta-data"></a>
+</h3>
+<p>For Seurat objects, <code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> reads
+the requested columns from <code>meta.data</code>, treats each row as
+one cell, and aggregates to subject-level counts. We build a minimal
+in-memory object so the extraction can run without a study-sized
+dataset; the expression matrix is present only because Seurat requires
+one, not because enrichment uses it.</p>
+<p>After extraction, <code>print(composition)</code> reports the number
+of subjects, categories, and groups. A short
+<code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code> call with reduced permutations
+confirms that the returned object is a valid input to the enrichment
+workflow described in the companion vignette.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gwmcelfresh.github.io/HellingerDistanceEnrichment/">HellingerDistanceEnrichment</a></span><span class="op">)</span></span>
 <span></span>
@@ -133,15 +217,19 @@ run without a study-sized dataset.</p>
 <span><span class="co">#&gt; $pValue</span></span>
 <span><span class="co">#&gt; [1] 0.4705882</span></span></code></pre></div>
 </div>
-<div class="section level2">
-<h2 id="anndata-obs-path">anndata obs path<a class="anchor" aria-label="anchor" href="#anndata-obs-path"></a>
-</h2>
-<p>The anndata route is mechanically the same: cell-level fields live in
-<code>obs</code>, and the extractor aggregates them to subjects. Column
-names may differ across pipelines, so the <code>subjectCol</code>,
-<code>categoryCol</code>, and <code>groupCol</code> arguments must match
-the object at hand. Once those columns are identified, the resulting
-composition object is interchangeable with the Seurat-derived one.</p>
+<div class="section level3">
+<h3 id="extract-compositions-from-anndata-obs">Extract compositions from anndata <code>obs</code><a class="anchor" aria-label="anchor" href="#extract-compositions-from-anndata-obs"></a>
+</h3>
+<p>The AnnData approach is mechanically the same: cell-level fields live
+in <code>obs</code>, and the extractor delegates to the same
+<code>data.frame</code> aggregation after coercing <code>obs</code> to a
+table. Column names may differ from the Seurat example
+(<code>subjectId</code> versus <code>donor_id</code>,
+<code>category</code> versus <code>cell_type</code>), which is why the
+<code>subjectCol</code>, <code>categoryCol</code>, and
+<code>groupCol</code> arguments exist. Once those names are aligned with
+the object at hand, the resulting <code>CategoryComposition</code> is
+interchangeable with one derived from Seurat.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"anndata"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">obs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -173,12 +261,71 @@ composition object is interchangeable with the Seurat-derived one.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $pValue</span></span>
 <span><span class="co">#&gt; [1] 1</span></span></code></pre></div>
-<p>The practical consequence is that object format need not dictate the
-enrichment workflow. Seurat and anndata are alternative containers for
-the same subject-category-group mapping. For HPC deployments, bind-mount
-study metadata at runtime rather than baking cohort files into container
-images; the extraction step then remains portable across environments
-while the cohort annotations stay outside the image layer.</p>
+</div>
+<div class="section level3">
+<h3 id="use-a-long-counts-table-directly">Use a long counts table directly<a class="anchor" aria-label="anchor" href="#use-a-long-counts-table-directly"></a>
+</h3>
+<p>Not every workflow passes through a single-cell object. If counts are
+already aggregated—one row per subject–category combination with an
+explicit count column—a long <code>data.frame</code> is a first-class
+input. When all four columns (<code>subjectCol</code>,
+<code>categoryCol</code>, <code>groupCol</code>, <code>countCol</code>)
+are present, <code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> detects the
+long-table format and sums duplicate subject–category rows rather than
+counting cells. The same table can be passed directly to
+<code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code> without calling the extractor
+first, though extracting explicitly makes the subject×category matrix
+visible and attaches provenance metadata.</p>
+<p>This approach is useful when metadata were exported from a database,
+pseudobulked upstream, or assembled outside R. The statistical object on
+the other side is unchanged.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">long_counts</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  subjectId <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"S1"</span>, <span class="st">"S2"</span>, <span class="st">"S3"</span>, <span class="st">"S4"</span><span class="op">)</span>, each <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
+<span>  category <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Category"</span>, <span class="fl">0</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>,</span>
+<span>  group <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Control"</span>, <span class="st">"Case"</span>, <span class="st">"Case"</span><span class="op">)</span>, each <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
+<span>  n <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">30</span>, <span class="fl">30</span>, <span class="fl">40</span>, <span class="fl">35</span>, <span class="fl">25</span>, <span class="fl">40</span>, <span class="fl">10</span>, <span class="fl">20</span>, <span class="fl">70</span>, <span class="fl">15</span>, <span class="fl">15</span>, <span class="fl">70</span><span class="op">)</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">composition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition</a></span><span class="op">(</span><span class="va">long_counts</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">composition</span><span class="op">)</span></span>
+<span><span class="co">#&gt; CategoryComposition with 4 subjects, 3 categories, and 2 groups</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions</a></span><span class="op">(</span></span>
+<span>  <span class="va">long_counts</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"permutation"</span>,</span>
+<span>  nPermutations <span class="op">=</span> <span class="fl">50</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">3</span></span>
+<span><span class="op">)</span><span class="op">$</span><span class="va">omnibus</span></span>
+<span><span class="co">#&gt; $effectSize</span></span>
+<span><span class="co">#&gt; [1] 4.096028</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $pValue</span></span>
+<span><span class="co">#&gt; [1] 0.3529412</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="deploy-on-hpc-or-in-containers">Deploy on HPC or in containers<a class="anchor" aria-label="anchor" href="#deploy-on-hpc-or-in-containers"></a>
+</h3>
+<p>In production, cohort annotations often change faster than container
+images or batch job definitions. Embedding subject and group labels in
+an image layer couples the enrichment code to a specific study snapshot
+and complicates reruns when metadata are corrected. Providing metadata
+at runtime—as exported <code>meta.data</code>, <code>obs</code>, or a
+long counts CSV—keeps the extraction step portable while the cohort
+files remain outside the image.</p>
+<p>The extraction function depends only on whether the three (or four)
+columns validate, not on where the table originated. That separation
+allows the same Docker image or HPC module to serve multiple studies by
+swapping mounted metadata files, with <code>subjectCol</code> /
+<code>categoryCol</code> / <code>groupCol</code> adjusted per cohort as
+needed.</p>
+<p>Object format therefore does not dictate the enrichment workflow.
+Seurat, AnnData, and long tables are alternative inputs to the same
+<code>CategoryComposition</code> object. Once counts are at subject
+scale with one group per subject, the distance and inference steps in
+the Hellinger enrichment vignette apply without modification.</p>
+</div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
