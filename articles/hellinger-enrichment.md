@@ -483,6 +483,4 @@ inputs without changing the inferential definition of $`R`$.
 
 Paul Edlefsen developed the original Hellinger between/within enrichment
 procedure for subject-level categorical compositions. This vignette and
-package document and implement that procedure, including his planned
-Bayesian nesting of composition uncertainty inside the label-exchange
-null.
+package document and implement that procedure.
