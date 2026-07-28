@@ -10,7 +10,7 @@ Description: Tests whether categorical compositions (e.g. cell-type or cluster
 License: GPL-3 + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 Imports:
     anndata,
     egg,

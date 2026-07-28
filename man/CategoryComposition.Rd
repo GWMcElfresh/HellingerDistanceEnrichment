@@ -2,7 +2,7 @@
 % Please edit documentation in R/category-composition.R
 \name{CategoryComposition}
 \alias{CategoryComposition}
-\title{Subject-level categorical composition container}
+\title{Build a CategoryComposition object from validated components.}
 \usage{
 CategoryComposition(
   counts,
@@ -13,20 +13,19 @@ CategoryComposition(
 )
 }
 \arguments{
-\item{counts}{Subjects-by-categories matrix of raw counts.}
+\item{counts}{Subjects-by-categories matrix of raw counts (non-negative).}
 
-\item{group}{Named factor of group labels.}
+\item{group}{Named factor of group labels, one per subject row in counts.}
 
-\item{categoryLevels}{Category column order.}
+\item{categoryLevels}{Character vector of category column order.}
 
-\item{subjectIds}{Subject identifiers.}
+\item{subjectIds}{Character vector of subject identifiers (rownames).}
 
-\item{provenance}{Source metadata list.}
+\item{provenance}{List describing source type and column mapping.}
 }
 \value{
-A \code{CategoryComposition} S3 object.
+A CategoryComposition object.
 }
 \description{
-Constructs a validated composition object used by comparison and plotting functions.
+Build a CategoryComposition object from validated components.
 }
-\keyword{internal}

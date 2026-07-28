@@ -18,7 +18,8 @@
 #' @param priorPseudocounts Jeffreys prior increment per category (default 1/2).
 #' @param pAdjustMethod Multiple-testing adjustment for contrasts (`"holm"`, `"BH"`, `"none"`).
 #' @param ... Ignored.
-#' @return A HellingerEnrichmentResult object.
+#' @return A HellingerEnrichmentResult with omnibus summary, pairwise
+#'   `contrasts`, and (Bayes only) long-format posterior `draws` for plotting.
 #' @export
 CompareGroupCompositions <- function(x,
                                      method = c("permutation", "bayes"),
@@ -343,6 +344,11 @@ run_bayes_draw <- function(counts, group, spec, n_permutations, prior_pseudocoun
 }
 
 #' Execute Bayes enrichment with full nesting per posterior draw.
+#'
+#' For each contrast, returns both a one-row posterior summary and the long
+#' draw table used by half-eye plots. Draw storage scales as
+#' `n_posterior * n_contrasts` effect sizes (omnibus excluded from the returned
+#' `draws`, matching `contrasts`).
 #' @keywords internal
 run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_permutations, n_cores, prior_pseudocounts) {
     counts <- composition$counts
@@ -383,6 +389,8 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
             stringsAsFactors = FALSE
         )
 
+        # Keep per-draw effect sizes for PlotCompositionContrasts half-eyes;
+        # summarizing to CI alone would force geom_interval and lose the slab.
         draws_df <- data.frame(
             contrastId = spec$contrastId,
             draw = draw_indices,

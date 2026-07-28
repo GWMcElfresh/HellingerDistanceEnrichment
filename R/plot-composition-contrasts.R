@@ -1,8 +1,14 @@
 #' Plot Hellinger enrichment contrasts with uncertainty.
 #'
-#' Displays contrast-level effect sizes (between/within Hellinger ratio) with
-#' ggdist half-eye densities for Bayes results or point estimates for
-#' permutation results. The omnibus statistic is shown as a reference line.
+#' Takes a HellingerEnrichmentResult, maps each pairwise contrast onto the
+#' between/within Hellinger ratio axis, and returns a ggplot. Bayes results
+#' are drawn from the retained posterior effect-size draws
+#' (`nPosterior` rows per contrast) via `ggdist::stat_halfeye`, because a
+#' density slab needs samples rather than summarized `effectCiLow`/`effectCiHigh`
+#' intervals. Permutation results have no draws, so they render as points
+#' colored by adjusted significance. When `showOmnibus` is TRUE, the omnibus
+#' ratio is overlaid as a dashed reference with its p-value labeled beside the
+#' line.
 #'
 #' @param result A HellingerEnrichmentResult from CompareGroupCompositions.
 #' @param theme ggplot2 theme (default egg::theme_article()).
@@ -29,6 +35,8 @@ PlotCompositionContrasts <- function(result,
     plot_data$significant <- plot_data$pAdj < 0.05
 
     if (result$method == "bayes") {
+        # Half-eye needs one effectSize per posterior draw; summarized CI
+        # columns alone cannot rebuild the density slab.
         if (is.null(result$draws) || nrow(result$draws) == 0) {
             stop("Bayes result has no posterior draws to plot; re-run CompareGroupCompositions")
         }
@@ -58,6 +66,8 @@ PlotCompositionContrasts <- function(result,
 
     p <- p +
         ggplot2::geom_vline(xintercept = 1, linetype = "dotted", color = "gray50") +
+        # Extra right-side expand so the omnibus label (hjust slightly past the
+        # vline) is not clipped when the omnibus ratio sits near the data max.
         ggplot2::scale_x_continuous(
             expand = ggplot2::expansion(mult = c(0.05, 0.15))
         ) +
@@ -78,6 +88,8 @@ PlotCompositionContrasts <- function(result,
             ggplot2::annotate(
                 "text",
                 x = result$omnibus$effectSize,
+                # Discrete contrast levels start at 1; 0.5 sits just below the
+                # lowest row without overlapping contrast labels.
                 y = 0.5,
                 label = sprintf("omnibus (p=%.3f)", result$omnibus$pValue),
                 hjust = -0.05,

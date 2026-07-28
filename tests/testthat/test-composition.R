@@ -161,6 +161,10 @@ test_that("Bayes nesting smoke test returns finite posterior-mean p", {
     expect_true(is.finite(result$omnibus$pValue))
     expect_true(all(is.finite(result$contrasts$pValue)))
     expect_true(all(is.finite(result$contrasts$effectCiLow)))
+    expect_true(!is.null(result$draws))
+    expect_gt(nrow(result$draws), 0)
+    expect_true(all(c("contrastId", "draw", "effectSize") %in% colnames(result$draws)))
+    expect_false("omnibus" %in% result$draws$contrastId)
 })
 
 test_that("Holm adjustment is monotonic on contrasts", {
@@ -208,6 +212,26 @@ test_that("PlotCompositionContrasts returns ggplot for permutation result", {
     )
     p <- PlotCompositionContrasts(result)
     expect_s3_class(p, "ggplot")
+})
+
+test_that("PlotCompositionContrasts uses halfeye for Bayes result", {
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 4,
+        n_categories = 3,
+        seed = 7
+    )
+    result <- CompareGroupCompositions(
+        long_table,
+        method = "bayes",
+        nPosterior = 5,
+        nPermutations = 10,
+        nCores = 1,
+        seed = 8
+    )
+    p <- PlotCompositionContrasts(result)
+    expect_s3_class(p, "ggplot")
+    layer_classes <- vapply(p$layers, function(layer) class(layer$stat)[1], character(1))
+    expect_true(any(grepl("halfeye|slabinterval", layer_classes, ignore.case = TRUE)))
 })
 
 test_that("custom contrast subset runs", {

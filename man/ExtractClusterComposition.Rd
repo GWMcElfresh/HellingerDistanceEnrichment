@@ -2,7 +2,7 @@
 % Please edit documentation in R/extract-cluster-composition.R
 \name{ExtractClusterComposition}
 \alias{ExtractClusterComposition}
-\title{Extract subject-by-category counts from metadata}
+\title{Extract subject-by-category counts from cell-level metadata.}
 \usage{
 ExtractClusterComposition(
   object,
@@ -14,21 +14,23 @@ ExtractClusterComposition(
 )
 }
 \arguments{
-\item{object}{A data.frame, Seurat object, or anndata object.}
+\item{object}{A data.frame, Seurat object, or anndata AnnData object.}
 
-\item{subjectCol}{Subject identifier column.}
+\item{subjectCol}{Metadata column identifying the subject (donor, sample).}
 
-\item{categoryCol}{Category label column.}
+\item{categoryCol}{Metadata column with category labels (cluster, cell type).}
 
-\item{groupCol}{Group label column (constant within subject).}
+\item{groupCol}{Metadata column with experimental group per cell; must be
+constant within each subject.}
 
-\item{countCol}{Count column for long-table input.}
+\item{countCol}{For long-table input, the raw count column (default "n").}
 
-\item{...}{Unused.}
+\item{...}{Passed to method-specific helpers.}
 }
 \value{
-A \code{CategoryComposition} object.
+A CategoryComposition object.
 }
 \description{
-Aggregates cell-level metadata to subject-level category counts.
+Aggregates cell-level categorical labels (clusters, cell types) to subject-level
+count matrices. Missing subject-category combinations are filled with zero.
 }

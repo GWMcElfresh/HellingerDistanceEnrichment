@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot-composition-contrasts.R
 \name{PlotCompositionContrasts}
 \alias{PlotCompositionContrasts}
-\title{Plot composition contrast effect sizes}
+\title{Plot Hellinger enrichment contrasts with uncertainty.}
 \usage{
 PlotCompositionContrasts(
   result,
@@ -12,17 +12,25 @@ PlotCompositionContrasts(
 )
 }
 \arguments{
-\item{result}{\code{HellingerEnrichmentResult}.}
+\item{result}{A HellingerEnrichmentResult from CompareGroupCompositions.}
 
-\item{theme}{ggplot2 theme (default \code{egg::theme_article()}).}
+\item{theme}{ggplot2 theme (default egg::theme_article()).}
 
-\item{showOmnibus}{Annotate omnibus effect size.}
+\item{showOmnibus}{If TRUE, annotate the omnibus effect size as a dashed line.}
 
-\item{...}{Passed to ggdist geoms.}
+\item{...}{Passed to ggdist::stat_halfeye for Bayes plots.}
 }
 \value{
 A ggplot object.
 }
 \description{
-Visualizes contrast-level enrichment ratios with ggdist uncertainty intervals.
+Takes a HellingerEnrichmentResult, maps each pairwise contrast onto the
+between/within Hellinger ratio axis, and returns a ggplot. Bayes results
+are drawn from the retained posterior effect-size draws
+(\code{nPosterior} rows per contrast) via \code{ggdist::stat_halfeye}, because a
+density slab needs samples rather than summarized \code{effectCiLow}/\code{effectCiHigh}
+intervals. Permutation results have no draws, so they render as points
+colored by adjusted significance. When \code{showOmnibus} is TRUE, the omnibus
+ratio is overlaid as a dashed reference with its p-value labeled beside the
+line.
 }

@@ -214,13 +214,13 @@ Interpretation differs slightly from permutation output. `bayes_result$omnibus$e
 PlotCompositionContrasts(perm_result)
 ```
 
-For permutation results, points are colored by whether Holm-adjusted `pAdj < 0.05`. For Bayes results, `ggdist` intervals show 95% credible ranges on each contrast's \(R\).
+For permutation results, points are colored by whether Holm-adjusted `pAdj < 0.05`. For Bayes results, half-eye plots show the posterior density of each contrast's \(R\) with nested intervals.
 
-```{r plot-bayes, fig.cap="Bayesian posterior-mean contrasts with 95% intervals."}
+```{r plot-bayes, fig.cap="Bayesian half-eye posterior densities for pairwise contrasts."}
 PlotCompositionContrasts(bayes_result)
 ```
 
-The two panels therefore display the same ratio scale with method-appropriate uncertainty. Permutation emphasizes discrete significance against the label null; Bayes overlays composition uncertainty on that same null.
+The two panels therefore display the same ratio scale with method-appropriate uncertainty. Permutation emphasizes discrete significance against the label null; Bayes overlays composition uncertainty on that same null via half-eye densities.
 
 ### Closing interpretation
 

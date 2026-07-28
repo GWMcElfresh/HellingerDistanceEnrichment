@@ -2,7 +2,7 @@
 % Please edit documentation in R/compare-group-compositions.R
 \name{CompareGroupCompositions}
 \alias{CompareGroupCompositions}
-\title{Compare compositions across groups}
+\title{Compare categorical compositions across groups.}
 \usage{
 CompareGroupCompositions(
   x,
@@ -18,29 +18,36 @@ CompareGroupCompositions(
 )
 }
 \arguments{
-\item{x}{\code{CategoryComposition} or long counts table.}
+\item{x}{A CategoryComposition object or long counts table.}
 
-\item{method}{\code{"permutation"} or \code{"bayes"}.}
+\item{method}{Inference method: \code{"permutation"} or \code{"bayes"}.}
 
-\item{contrasts}{Optional named custom contrasts.}
+\item{contrasts}{Optional named list of custom contrast specifications. Each
+element may be a length-2 character vector of group levels (pairwise subset)
+or a list with \code{collapse} (named remap of group levels) and/or \code{groups}
+(subset to these levels before testing).}
 
-\item{nPermutations}{Permutation count.}
+\item{nPermutations}{Number of label permutations (permutation method).}
 
-\item{nPosterior}{Posterior draw count for Bayes method.}
+\item{nPosterior}{Number of posterior draws (bayes method).}
 
-\item{nCores}{Parallel workers.}
+\item{nCores}{Number of parallel workers (default 1).}
 
-\item{seed}{Random seed.}
+\item{seed}{Random seed for reproducibility.}
 
-\item{priorPseudocounts}{Jeffreys prior increment per category.}
+\item{priorPseudocounts}{Jeffreys prior increment per category (default 1/2).}
 
-\item{pAdjustMethod}{Contrast p-value adjustment method.}
+\item{pAdjustMethod}{Multiple-testing adjustment for contrasts (\code{"holm"}, \code{"BH"}, \code{"none"}).}
 
-\item{...}{Unused.}
+\item{...}{Ignored.}
 }
 \value{
-A \code{HellingerEnrichmentResult} object.
+A HellingerEnrichmentResult with omnibus summary, pairwise
+\code{contrasts}, and (Bayes only) long-format posterior \code{draws} for plotting.
 }
 \description{
-Tests between-versus-within Hellinger distance ratios with omnibus and contrast statistics.
+Tests whether between-group Hellinger distances exceed within-group distances
+using a permutation null or conjugate Dirichlet posterior-predictive Bayes.
+Computes an omnibus statistic plus all pairwise group contrasts and optional
+custom contrasts (subsets or collapses).
 }
