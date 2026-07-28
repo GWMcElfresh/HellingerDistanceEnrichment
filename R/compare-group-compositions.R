@@ -81,6 +81,7 @@ CompareGroupCompositions <- function(x,
         list(
             omnibus = result_body$omnibus,
             contrasts = contrasts_df,
+            draws = result_body$draws,
             method = method,
             settings = list(
                 nPermutations = nPermutations,
@@ -312,6 +313,7 @@ run_permutation_enrichment <- function(composition, contrast_specs, n_permutatio
             pValue = omnibus_row$pValue[1]
         ),
         contrasts = contrast_only,
+        draws = NULL,
         diagnostics = NULL
     )
 }
@@ -372,7 +374,7 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
             names = FALSE
         )
 
-        data.frame(
+        summary_row <- data.frame(
             contrastId = spec$contrastId,
             effectSize = mean(effect_sizes),
             pValue = mean(p_values),
@@ -380,19 +382,32 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
             effectCiHigh = ci_quantiles[2],
             stringsAsFactors = FALSE
         )
+
+        draws_df <- data.frame(
+            contrastId = spec$contrastId,
+            draw = draw_indices,
+            effectSize = effect_sizes,
+            stringsAsFactors = FALSE
+        )
+
+        list(summary = summary_row, draws = draws_df)
     }
 
-    contrast_rows <- if (n_cores > 1 && length(contrast_names) > 1) {
+    contrast_results <- if (n_cores > 1 && length(contrast_names) > 1) {
         parallel::mclapply(contrast_names, run_contrast_bayes, mc.cores = min(n_cores, length(contrast_names)))
     } else {
         lapply(contrast_names, run_contrast_bayes)
     }
 
-    contrasts_df <- do.call(rbind, contrast_rows)
+    contrasts_df <- do.call(rbind, lapply(contrast_results, function(x) x$summary))
     rownames(contrasts_df) <- NULL
+
+    draws_df <- do.call(rbind, lapply(contrast_results, function(x) x$draws))
+    rownames(draws_df) <- NULL
 
     omnibus_row <- contrasts_df[contrasts_df$contrastId == "omnibus", , drop = FALSE]
     contrast_only <- contrasts_df[contrasts_df$contrastId != "omnibus", , drop = FALSE]
+    draws_only <- draws_df[draws_df$contrastId != "omnibus", , drop = FALSE]
 
     list(
         omnibus = list(
@@ -402,6 +417,7 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
             effectCiHigh = omnibus_row$effectCiHigh[1]
         ),
         contrasts = contrast_only,
+        draws = draws_only,
         diagnostics = list(nPosterior = n_posterior, nPermutations = n_permutations)
     )
 }
