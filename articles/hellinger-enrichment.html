@@ -327,22 +327,22 @@ are approximately exchangeable. We then multiply counts in
 introducing a modest, known enrichment in that group alone. Condition2
 is left unmodified, so its compositions remain exchangeable with Control
 under the generating process.</p>
-<p>The internal functions <code>build_synthetic_long_table()</code> and
-<code>plant_group_structure()</code> live in the package namespace for
+<p>The internal functions <code><a href="../reference/build_synthetic_long_table.html">build_synthetic_long_table()</a></code> and
+<code><a href="../reference/plant_group_structure.html">plant_group_structure()</a></code> live in the package namespace for
 vignette and test use; they are not exported, but they provide a
 reproducible procedure for simulating compositional cohorts.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://gwmcelfresh.github.io/HellingerDistanceEnrichment/">HellingerDistanceEnrichment</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">2026</span><span class="op">)</span></span>
-<span><span class="va">long_table</span> <span class="op">&lt;-</span> <span class="fu">HellingerDistanceEnrichment</span><span class="fu">:::</span><span class="fu">build_synthetic_long_table</span><span class="op">(</span></span>
+<span><span class="va">long_table</span> <span class="op">&lt;-</span> <span class="fu">HellingerDistanceEnrichment</span><span class="fu">:::</span><span class="fu"><a href="../reference/build_synthetic_long_table.html">build_synthetic_long_table</a></span><span class="op">(</span></span>
 <span>  n_subjects_per_group <span class="op">=</span> <span class="fl">6</span>,</span>
 <span>  n_categories <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Condition1"</span>, <span class="st">"Condition2"</span><span class="op">)</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">2026</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">long_table</span> <span class="op">&lt;-</span> <span class="fu">HellingerDistanceEnrichment</span><span class="fu">:::</span><span class="fu">plant_group_structure</span><span class="op">(</span></span>
+<span><span class="va">long_table</span> <span class="op">&lt;-</span> <span class="fu">HellingerDistanceEnrichment</span><span class="fu">:::</span><span class="fu"><a href="../reference/plant_group_structure.html">plant_group_structure</a></span><span class="op">(</span></span>
 <span>  <span class="va">long_table</span>,</span>
 <span>  target_group <span class="op">=</span> <span class="st">"Condition1"</span>,</span>
 <span>  target_category <span class="op">=</span> <span class="st">"Category0"</span>,</span>
@@ -533,20 +533,21 @@ Permutation contrast panel with omnibus reference.
 </p>
 </div>
 <p>For permutation results, points are colored by whether Holm-adjusted
-<code>pAdj &lt; 0.05</code>. For Bayes results, <code>ggdist</code>
-intervals show 95% credible ranges on each contrast’s
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
+<code>pAdj &lt; 0.05</code>. For Bayes results, half-eye plots show the
+posterior density of each contrast’s
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+with nested intervals.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts</a></span><span class="op">(</span><span class="va">bayes_result</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="hellinger-enrichment_files/figure-html/plot-bayes-1.png" class="r-plt" alt="Bayesian posterior-mean contrasts with 95% intervals." width="672"><p class="caption">
-Bayesian posterior-mean contrasts with 95% intervals.
+<img src="hellinger-enrichment_files/figure-html/plot-bayes-1.png" class="r-plt" alt="Bayesian half-eye posterior densities for pairwise contrasts." width="672"><p class="caption">
+Bayesian half-eye posterior densities for pairwise contrasts.
 </p>
 </div>
 <p>The two panels therefore display the same ratio scale with
 method-appropriate uncertainty. Permutation emphasizes discrete
 significance against the label null; Bayes overlays composition
-uncertainty on that same null.</p>
+uncertainty on that same null via half-eye densities.</p>
 </div>
 <div class="section level3">
 <h3 id="closing-interpretation">Closing interpretation<a class="anchor" aria-label="anchor" href="#closing-interpretation"></a>

@@ -1,6 +1,8 @@
-# Extract subject-by-category counts from metadata
+# Extract subject-by-category counts from cell-level metadata.
 
-Aggregates cell-level metadata to subject-level category counts.
+Aggregates cell-level categorical labels (clusters, cell types) to
+subject-level count matrices. Missing subject-category combinations are
+filled with zero.
 
 ## Usage
 
@@ -19,28 +21,29 @@ ExtractClusterComposition(
 
 - object:
 
-  A data.frame, Seurat object, or anndata object.
+  A data.frame, Seurat object, or anndata AnnData object.
 
 - subjectCol:
 
-  Subject identifier column.
+  Metadata column identifying the subject (donor, sample).
 
 - categoryCol:
 
-  Category label column.
+  Metadata column with category labels (cluster, cell type).
 
 - groupCol:
 
-  Group label column (constant within subject).
+  Metadata column with experimental group per cell; must be constant
+  within each subject.
 
 - countCol:
 
-  Count column for long-table input.
+  For long-table input, the raw count column (default "n").
 
 - ...:
 
-  Unused.
+  Passed to method-specific helpers.
 
 ## Value
 
-A `CategoryComposition` object.
+A CategoryComposition object.

@@ -1,7 +1,6 @@
-# Subject-level categorical composition container
+# Build a CategoryComposition object from validated components.
 
-Constructs a validated composition object used by comparison and
-plotting functions.
+Build a CategoryComposition object from validated components.
 
 ## Usage
 
@@ -19,24 +18,24 @@ CategoryComposition(
 
 - counts:
 
-  Subjects-by-categories matrix of raw counts.
+  Subjects-by-categories matrix of raw counts (non-negative).
 
 - group:
 
-  Named factor of group labels.
+  Named factor of group labels, one per subject row in counts.
 
 - categoryLevels:
 
-  Category column order.
+  Character vector of category column order.
 
 - subjectIds:
 
-  Subject identifiers.
+  Character vector of subject identifiers (rownames).
 
 - provenance:
 
-  Source metadata list.
+  List describing source type and column mapping.
 
 ## Value
 
-A `CategoryComposition` S3 object.
+A CategoryComposition object.

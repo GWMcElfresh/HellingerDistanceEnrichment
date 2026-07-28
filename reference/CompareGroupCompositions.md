@@ -1,7 +1,10 @@
-# Compare compositions across groups
+# Compare categorical compositions across groups.
 
-Tests between-versus-within Hellinger distance ratios with omnibus and
-contrast statistics.
+Tests whether between-group Hellinger distances exceed within-group
+distances using a permutation null or conjugate Dirichlet
+posterior-predictive Bayes. Computes an omnibus statistic plus all
+pairwise group contrasts and optional custom contrasts (subsets or
+collapses).
 
 ## Usage
 
@@ -24,44 +27,49 @@ CompareGroupCompositions(
 
 - x:
 
-  `CategoryComposition` or long counts table.
+  A CategoryComposition object or long counts table.
 
 - method:
 
-  `"permutation"` or `"bayes"`.
+  Inference method: `"permutation"` or `"bayes"`.
 
 - contrasts:
 
-  Optional named custom contrasts.
+  Optional named list of custom contrast specifications. Each element
+  may be a length-2 character vector of group levels (pairwise subset)
+  or a list with `collapse` (named remap of group levels) and/or
+  `groups` (subset to these levels before testing).
 
 - nPermutations:
 
-  Permutation count.
+  Number of label permutations (permutation method).
 
 - nPosterior:
 
-  Posterior draw count for Bayes method.
+  Number of posterior draws (bayes method).
 
 - nCores:
 
-  Parallel workers.
+  Number of parallel workers (default 1).
 
 - seed:
 
-  Random seed.
+  Random seed for reproducibility.
 
 - priorPseudocounts:
 
-  Jeffreys prior increment per category.
+  Jeffreys prior increment per category (default 1/2).
 
 - pAdjustMethod:
 
-  Contrast p-value adjustment method.
+  Multiple-testing adjustment for contrasts (`"holm"`, `"BH"`,
+  `"none"`).
 
 - ...:
 
-  Unused.
+  Ignored.
 
 ## Value
 
-A `HellingerEnrichmentResult` object.
+A HellingerEnrichmentResult with omnibus summary, pairwise `contrasts`,
+and (Bayes only) long-format posterior `draws` for plotting.

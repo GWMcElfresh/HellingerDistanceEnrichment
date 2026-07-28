@@ -209,10 +209,13 @@ introducing a modest, known enrichment in that group alone. Condition2
 is left unmodified, so its compositions remain exchangeable with Control
 under the generating process.
 
-The internal functions `build_synthetic_long_table()` and
-`plant_group_structure()` live in the package namespace for vignette and
-test use; they are not exported, but they provide a reproducible
-procedure for simulating compositional cohorts.
+The internal functions
+[`build_synthetic_long_table()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/build_synthetic_long_table.md)
+and
+[`plant_group_structure()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/plant_group_structure.md)
+live in the package namespace for vignette and test use; they are not
+exported, but they provide a reproducible procedure for simulating
+compositional cohorts.
 
 ``` r
 
@@ -419,23 +422,23 @@ reference.](hellinger-enrichment_files/figure-html/plot-perm-1.png)
 Permutation contrast panel with omnibus reference.
 
 For permutation results, points are colored by whether Holm-adjusted
-`pAdj < 0.05`. For Bayes results, `ggdist` intervals show 95% credible
-ranges on each contrast’s $`R`$.
+`pAdj < 0.05`. For Bayes results, half-eye plots show the posterior
+density of each contrast’s $`R`$ with nested intervals.
 
 ``` r
 
 PlotCompositionContrasts(bayes_result)
 ```
 
-![Bayesian posterior-mean contrasts with 95%
-intervals.](hellinger-enrichment_files/figure-html/plot-bayes-1.png)
+![Bayesian half-eye posterior densities for pairwise
+contrasts.](hellinger-enrichment_files/figure-html/plot-bayes-1.png)
 
-Bayesian posterior-mean contrasts with 95% intervals.
+Bayesian half-eye posterior densities for pairwise contrasts.
 
 The two panels therefore display the same ratio scale with
 method-appropriate uncertainty. Permutation emphasizes discrete
 significance against the label null; Bayes overlays composition
-uncertainty on that same null.
+uncertainty on that same null via half-eye densities.
 
 ### Closing interpretation
 
