@@ -2,9 +2,9 @@
 
 Tests whether categorical compositions (e.g. cell-type or cluster
 frequencies per subject) differ between groups using Hellinger-distance
-enrichment ratios. Supports permutation and conjugate Dirichlet
-posterior-predictive Bayesian inference with Seurat, anndata, and
-long-table inputs.
+enrichment ratios developed by Paul Edlefsen. Supports permutation and
+conjugate Dirichlet posterior-predictive Bayesian inference with Seurat,
+anndata, and long-table inputs.
 
 ## See also
 
@@ -20,3 +20,7 @@ Useful links:
 ## Author
 
 **Maintainer**: GW McElfresh <gw@example.com>
+
+Authors:
+
+- Paul Edlefsen (Original Hellinger enrichment methods)

@@ -1,6 +1,7 @@
 # Hellinger distance between two frequency vectors on a simplex.
 
-Hellinger distance between two frequency vectors on a simplex.
+Part of Paul Edlefsen's original enrichment procedure (subject-level
+Hellinger geometry on softened multinomial compositions).
 
 ## Usage
 
@@ -20,4 +21,4 @@ compute_hellinger_distance_freqs(freqs1, freqs2)
 
 ## Value
 
-Scalar Hellinger distance in 0, 1.
+Scalar Hellinger distance in \eqn\[0, 1\].

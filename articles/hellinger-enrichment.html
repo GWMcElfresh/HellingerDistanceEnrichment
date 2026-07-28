@@ -59,6 +59,8 @@
       <h1>Hellinger enrichment for subject-level compositions</h1>
                         <h4 data-toc-skip class="author">GW
 McElfresh</h4>
+                        <h4 data-toc-skip class="author">Methods: Paul
+Edlefsen</h4>
             
             <h4 data-toc-skip class="date">2026-07-28</h4>
       
@@ -87,6 +89,13 @@ carry signal.</p>
 <div class="section level2">
 <h2 id="concepts">Concepts<a class="anchor" aria-label="anchor" href="#concepts"></a>
 </h2>
+<p>The inferential core below—Hellinger geometry on Jeffreys-softened
+subject compositions, the between/within distance ratio
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
+observed-inclusive label permutation, and collapse/subset
+contrasts—follows methods developed by Paul Edlefsen. The nested
+Dirichlet Bayes option implements the composition-uncertainty step he
+outlined beyond fixed-composition permutation.</p>
 <div class="section level3">
 <h3 id="what-is-composition-enrichment">What is composition enrichment?<a class="anchor" aria-label="anchor" href="#what-is-composition-enrichment"></a>
 </h3>
@@ -584,6 +593,15 @@ inferential definition of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
 </div>
 </div>
+<div class="section level2">
+<h2 id="acknowledgments">Acknowledgments<a class="anchor" aria-label="anchor" href="#acknowledgments"></a>
+</h2>
+<p>Paul Edlefsen developed the original Hellinger between/within
+enrichment procedure for subject-level categorical compositions. This
+vignette and package document and implement that procedure, including
+his planned Bayesian nesting of composition uncertainty inside the
+label-exchange null.</p>
+</div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
 </div>
@@ -591,7 +609,7 @@ inferential definition of
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by GW McElfresh.</p>
+  <p>Developed by GW McElfresh, Paul Edlefsen.</p>
 </div>
 
 <div class="pkgdown-footer-right">

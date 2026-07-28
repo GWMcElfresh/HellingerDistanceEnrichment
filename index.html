@@ -61,7 +61,7 @@
 <div class="section level2">
 <h2 id="documentation">Documentation<a class="anchor" aria-label="anchor" href="#documentation"></a>
 </h2>
-<p>Vignettes are published with pkgdown:</p>
+<p>Vignettes are published here:</p>
 <p><a href="https://gwmcelfresh.github.io/HellingerDistanceEnrichment/" class="uri">https://gwmcelfresh.github.io/HellingerDistanceEnrichment/</a></p>
 <ul>
 <li><a href="https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/hellinger-enrichment.html">Hellinger enrichment for subject-level compositions</a></li>
@@ -125,18 +125,24 @@
 <div class="section level2">
 <h2 id="methods">Methods<a class="anchor" aria-label="anchor" href="#methods"></a>
 </h2>
+<p>Paul Edlefsen developed the original Hellinger enrichment procedure: Jeffreys softening of subject-level counts, pairwise Hellinger distances on the simplex, the between/within mean-distance ratio as the effect size, label permutation with an observed-inclusive p-value, and collapse/subset contrasts. This package implements that procedure and extends it.</p>
 <ul>
 <li>
-<strong>Permutation:</strong> shuffle group labels; p-value includes the observed ratio (workbook style).</li>
+<strong>Permutation:</strong> shuffle group labels on a fixed (softened) distance matrix; p-value includes the observed ratio (workbook style).</li>
 <li>
 <strong>Bayes:</strong> for each Dirichlet posterior draw of subject compositions, run a full nested permutation null; report the posterior mean p-value and effect-size credible intervals.</li>
 </ul>
 <p>Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted.</p>
 </div>
 <div class="section level2">
+<h2 id="acknowledgments">Acknowledgments<a class="anchor" aria-label="anchor" href="#acknowledgments"></a>
+</h2>
+<p>Statistical methods for Hellinger-distance enrichment of categorical compositions were developed by Paul Edlefsen. Package implementation, documentation, and interfaces are by GW McElfresh.</p>
+</div>
+<div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>
 </h2>
-<p>GPL-3 (consistent with Seurat).</p>
+<p>GPL-3</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -168,6 +174,8 @@
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
 <li>GW McElfresh <br><small class="roles"> Author, maintainer </small>   </li>
+<li>Paul Edlefsen <br><small class="roles"> Author </small>   </li>
+<li><a href="authors.html">More about authors...</a></li>
 </ul>
 </div>
 
@@ -178,7 +186,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by GW McElfresh.</p>
+  <p>Developed by GW McElfresh, Paul Edlefsen.</p>
 </div>
 
 <div class="pkgdown-footer-right">

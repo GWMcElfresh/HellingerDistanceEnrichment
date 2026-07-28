@@ -73,3 +73,20 @@ CompareGroupCompositions(
 
 A HellingerEnrichmentResult with omnibus summary, pairwise `contrasts`,
 and (Bayes only) long-format posterior `draws` for plotting.
+
+## Details
+
+The between/within Hellinger ratio, Jeffreys softening,
+observed-inclusive label-permutation p-value, and collapse/subset
+contrasts follow Paul Edlefsen's original procedure. `method = "bayes"`
+implements his outlined next step: nest Dirichlet draws of subject
+compositions inside that same permutation null so composition
+uncertainty is not treated as fixed.
+
+## References
+
+Edlefsen, P. Original Hellinger between/within enrichment procedure for
+subject-level categorical compositions, including Jeffreys softening,
+the between/within ratio statistic, label permutation, and
+collapse/subset contrasts. Bayesian nesting of composition uncertainty
+was his planned extension beyond fixed-composition permutation.

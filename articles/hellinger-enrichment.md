@@ -18,6 +18,13 @@ comparisons carry signal.
 
 ## Concepts
 
+The inferential core below—Hellinger geometry on Jeffreys-softened
+subject compositions, the between/within distance ratio $`R`$,
+observed-inclusive label permutation, and collapse/subset
+contrasts—follows methods developed by Paul Edlefsen. The nested
+Dirichlet Bayes option implements the composition-uncertainty step he
+outlined beyond fixed-composition permutation.
+
 ### What is composition enrichment?
 
 Composition enrichment asks whether experimental groups occupy different
@@ -471,3 +478,11 @@ contrast specification, ratio-based inference, and contrast
 plotting—extends from this synthetic example to real
 [`ExtractClusterComposition()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ExtractClusterComposition.md)
 inputs without changing the inferential definition of $`R`$.
+
+## Acknowledgments
+
+Paul Edlefsen developed the original Hellinger between/within enrichment
+procedure for subject-level categorical compositions. This vignette and
+package document and implement that procedure, including his planned
+Bayesian nesting of composition uncertainty inside the label-exchange
+null.

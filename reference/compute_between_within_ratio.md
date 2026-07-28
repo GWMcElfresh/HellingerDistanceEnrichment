@@ -1,6 +1,7 @@
 # Between-to-within Hellinger distance ratio from a group summary matrix.
 
-Between-to-within Hellinger distance ratio from a group summary matrix.
+Edlefsen's enrichment effect size: mean between-group pairwise Hellinger
+distance divided by mean within-group pairwise Hellinger distance.
 
 ## Usage
 
