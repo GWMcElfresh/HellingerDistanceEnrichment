@@ -1,8 +1,11 @@
 #' Hellinger distance between two frequency vectors on a simplex.
 #'
+#' Part of Paul Edlefsen's original enrichment procedure (subject-level
+#' Hellinger geometry on softened multinomial compositions).
+#'
 #' @param freqs1 Numeric frequency vector (sums to 1).
 #' @param freqs2 Numeric frequency vector (sums to 1).
-#' @return Scalar Hellinger distance in [0, 1].
+#' @return Scalar Hellinger distance in \\eqn{[0, 1]}.
 #' @keywords internal
 compute_hellinger_distance_freqs <- function(freqs1, freqs2) {
     diff_sqrt <- sqrt(freqs1) - sqrt(freqs2)
@@ -115,6 +118,9 @@ build_group_distance_summary_matrix <- function(group, dist_matrix) {
 }
 
 #' Between-to-within Hellinger distance ratio from a group summary matrix.
+#'
+#' Edlefsen's enrichment effect size: mean between-group pairwise Hellinger
+#' distance divided by mean within-group pairwise Hellinger distance.
 #'
 #' @param group_summary_matrix Square matrix from build_group_distance_summary_matrix.
 #' @return Scalar ratio (mean between / mean within).

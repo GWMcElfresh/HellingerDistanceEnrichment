@@ -9,7 +9,7 @@ Bayesian inference.
 
 ## Documentation
 
-Vignettes are published with pkgdown:
+Vignettes are published here:
 
 https://gwmcelfresh.github.io/HellingerDistanceEnrichment/
 
@@ -83,11 +83,23 @@ apptainer build hellinger-distance-enrichment.sif \
 
 ## Methods
 
-- **Permutation:** shuffle group labels; p-value includes the observed ratio (workbook style).
+Paul Edlefsen developed the original Hellinger enrichment procedure: Jeffreys
+softening of subject-level counts, pairwise Hellinger distances on the simplex,
+the between/within mean-distance ratio as the effect size, label permutation with
+an observed-inclusive p-value, and collapse/subset contrasts. This package
+implements that procedure and extends it.
+
+- **Permutation:** shuffle group labels on a fixed (softened) distance matrix; p-value includes the observed ratio (workbook style).
 - **Bayes:** for each Dirichlet posterior draw of subject compositions, run a full nested permutation null; report the posterior mean p-value and effect-size credible intervals.
 
 Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted.
 
+## Acknowledgments
+
+Statistical methods for Hellinger-distance enrichment of categorical compositions
+were developed by Paul Edlefsen. Package implementation, documentation, and
+interfaces are by GW McElfresh.
+
 ## License
 
-GPL-3 (consistent with Seurat).
+GPL-3

@@ -13,6 +13,7 @@ compute_between_within_ratio(group_summary_matrix)
 Scalar ratio (mean between / mean within).
 }
 \description{
-Between-to-within Hellinger distance ratio from a group summary matrix.
+Edlefsen's enrichment effect size: mean between-group pairwise Hellinger
+distance divided by mean within-group pairwise Hellinger distance.
 }
 \keyword{internal}

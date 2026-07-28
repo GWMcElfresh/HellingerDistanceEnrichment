@@ -7,6 +7,7 @@
 permutation_p_value(observed_ratio, permuted_ratios)
 }
 \description{
-Permutation p-value for one contrast (includes observed in numerator).
+Matches Edlefsen's workbook form:
+\code{mean(c(permuted_ratios, observed_ratio) >= observed_ratio)}.
 }
 \keyword{internal}

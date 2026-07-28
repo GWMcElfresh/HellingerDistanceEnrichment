@@ -5,6 +5,12 @@
 #' Computes an omnibus statistic plus all pairwise group contrasts and optional
 #' custom contrasts (subsets or collapses).
 #'
+#' The between/within Hellinger ratio, Jeffreys softening, observed-inclusive
+#' label-permutation p-value, and collapse/subset contrasts follow Paul
+#' Edlefsen's original procedure. `method = "bayes"` implements his outlined
+#' next step: nest Dirichlet draws of subject compositions inside that same
+#' permutation null so composition uncertainty is not treated as fixed.
+#'
 #' @param x A CategoryComposition object or long counts table.
 #' @param method Inference method: `"permutation"` or `"bayes"`.
 #' @param contrasts Optional named list of custom contrast specifications. Each
@@ -20,6 +26,12 @@
 #' @param ... Ignored.
 #' @return A HellingerEnrichmentResult with omnibus summary, pairwise
 #'   `contrasts`, and (Bayes only) long-format posterior `draws` for plotting.
+#' @references
+#' Edlefsen, P. Original Hellinger between/within enrichment procedure for
+#' subject-level categorical compositions, including Jeffreys softening, the
+#' between/within ratio statistic, label permutation, and collapse/subset
+#' contrasts. Bayesian nesting of composition uncertainty was his planned
+#' extension beyond fixed-composition permutation.
 #' @export
 CompareGroupCompositions <- function(x,
                                      method = c("permutation", "bayes"),
@@ -242,6 +254,9 @@ compute_observed_contrast <- function(counts, group, spec, prior_pseudocounts) {
 }
 
 #' Permutation p-value for one contrast (includes observed in numerator).
+#'
+#' Matches Edlefsen's workbook form:
+#' `mean(c(permuted_ratios, observed_ratio) >= observed_ratio)`.
 #' @keywords internal
 permutation_p_value <- function(observed_ratio, permuted_ratios) {
     mean(c(permuted_ratios, observed_ratio) >= observed_ratio)

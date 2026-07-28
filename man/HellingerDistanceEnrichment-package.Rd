@@ -5,7 +5,7 @@
 \alias{HellingerDistanceEnrichment-package}
 \title{HellingerDistanceEnrichment: Hellinger Distance Enrichment for Categorical Composition Data}
 \description{
-Tests whether categorical compositions (e.g. cell-type or cluster frequencies per subject) differ between groups using Hellinger-distance enrichment ratios. Supports permutation and conjugate Dirichlet posterior-predictive Bayesian inference with Seurat, anndata, and long-table inputs.
+Tests whether categorical compositions (e.g. cell-type or cluster frequencies per subject) differ between groups using Hellinger-distance enrichment ratios developed by Paul Edlefsen. Supports permutation and conjugate Dirichlet posterior-predictive Bayesian inference with Seurat, anndata, and long-table inputs.
 }
 \seealso{
 Useful links:
@@ -18,6 +18,11 @@ Useful links:
 }
 \author{
 \strong{Maintainer}: GW McElfresh \email{gw@example.com}
+
+Authors:
+\itemize{
+  \item Paul Edlefsen (Original Hellinger enrichment methods)
+}
 
 }
 \keyword{internal}
