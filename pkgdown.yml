@@ -4,7 +4,7 @@ pkgdown_sha: ~
 articles:
   extract-metadata: extract-metadata.html
   hellinger-enrichment: hellinger-enrichment.html
-last_built: 2026-07-29T02:03Z
+last_built: 2026-07-29T03:13Z
 urls:
   reference: https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference
   article: https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles
