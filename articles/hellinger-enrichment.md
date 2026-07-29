@@ -13,8 +13,8 @@ so this vignette uses three groups: a Control, a Condition1 group with
 an imposed enrichment, and a Condition2 group that remains exchangeable
 with Control. Here, we illustrate `HellingerDistanceEnrichment` on that
 synthetic cohort, separating the conceptual framework (distance, ratio,
-contrasts, inference) from the executable workflow that recovers which
-comparisons carry signal.
+contrasts, inference) from the worked analysis that recovers which
+comparisons are statistically different.
 
 ## Concepts
 
@@ -47,11 +47,14 @@ cell level within a single subject does not, by itself, establish
 group-level enrichment, because one subject’s multinomial draw can
 dominate the apparent pattern.
 
-This package tests enrichment by comparing mean pairwise Hellinger
-distances among subjects in different groups to mean pairwise distances
-among subjects in the same group. The output is an effect-size ratio
-together with permutation or posterior-predictive p-values, optionally
-decomposed into omnibus and contrast-specific summaries.
+This package tests enrichment by comparing the average pairwise
+Hellinger distance between subjects in different groups to the average
+pairwise distance between subjects in the same group. The output is an
+effect-size ratio and a p-value: from label permutation on fixed
+compositions, or, under the Bayesian option, from a permutation null
+averaged across posterior composition draws. Either way, the package
+breaks the result down into an omnibus summary and contrast-specific
+results.
 
 ### Why Hellinger distance?
 
@@ -124,7 +127,7 @@ identifiable and inference stops with an error.
 
 This ratio is the test statistic for both permutation and Bayes methods.
 It compresses a full distance matrix into a single scale-free quantity
-that can be compared across contrasts and simulation draws.
+that can be compared across contrasts and posterior draws.
 
 ### What is a contrast?
 
@@ -150,11 +153,11 @@ Two levels of p-value reporting matter in practice:
   with `pAdj` applying Holm adjustment across the contrast table by
   default (`pAdjustMethod = "holm"`).
 
-Omnibus and pairwise contrasts therefore answer nested questions. A
-significant omnibus result indicates that at least some group separation
-exists under the ratio metric; pairwise contrasts localize that
-separation, with multiplicity control on the contrast table rather than
-on the omnibus line.
+Omnibus and pairwise contrasts answer nested questions. A significant
+omnibus result indicates that at least some group separation exists
+under the ratio metric; pairwise contrasts localize that separation,
+with multiplicity control on the contrast table rather than on the
+omnibus line.
 
 ### Permutation vs Bayes: related but non-equivalent questions
 
@@ -193,13 +196,14 @@ package reports:
 - posterior-mean p-value (`pValue`),
 - 95% credible interval on $`R`$ (`effectCiLow`, `effectCiHigh`).
 
-The Bayesian approach therefore nests composition uncertainty inside the
-label-exchange null. When counts are sparse, that nesting can widen
-credible intervals or inflate mean p-values relative to plain
-permutation, even when point ratios look similar. When counts are dense
-and the imposed enrichment is strong—as in the synthetic example
-below—the two approaches often agree on which contrasts are elevated,
-though they still answer formally different questions.
+By sampling compositions before permuting labels, the Bayesian approach
+nests composition uncertainty inside the label-exchange null. When
+counts are sparse, that nesting can widen credible intervals or inflate
+mean p-values relative to plain permutation, even when point ratios look
+similar. When counts are dense and the imposed enrichment is strong, as
+in the synthetic example below, the two approaches often agree on which
+contrasts are elevated, though they still answer formally different
+questions.
 
 ## Execution
 
@@ -228,12 +232,12 @@ compositional cohorts.
 
 library(HellingerDistanceEnrichment)
 
-set.seed(2026)
+set.seed(26)
 long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
   n_subjects_per_group = 6,
   n_categories = 5,
   groups = c("Control", "Condition1", "Condition2"),
-  seed = 2026
+  seed = 26
 )
 
 long_table <- HellingerDistanceEnrichment:::plant_group_structure(
@@ -245,12 +249,12 @@ long_table <- HellingerDistanceEnrichment:::plant_group_structure(
 
 head(long_table)
 #>     subjectId  category   group  n
-#> 1 Control_S01 Category0 Control 22
+#> 1 Control_S01 Category0 Control 12
 #> 2 Control_S01 Category1 Control 20
-#> 3 Control_S01 Category2 Control 15
-#> 4 Control_S01 Category3 Control 20
-#> 5 Control_S01 Category4 Control 23
-#> 6 Control_S02 Category0 Control 20
+#> 3 Control_S01 Category2 Control 27
+#> 4 Control_S01 Category3 Control 23
+#> 5 Control_S01 Category4 Control 18
+#> 6 Control_S02 Category0 Control 18
 table(unique(long_table[, c("subjectId", "group")])$group)
 #> 
 #> Condition1 Condition2    Control 
@@ -285,37 +289,37 @@ composition
 perm_result <- CompareGroupCompositions(
   composition,
   method = "permutation",
-  nPermutations = 200,
+  nPermutations = 500,
   seed = 42
 )
 
 perm_result
-#> HellingerEnrichmentResult (permutation): omnibus effectSize=1.8248, pValue=0.0050
+#> HellingerEnrichmentResult (permutation): omnibus effectSize=2.0873, pValue=0.0020
 #>   3 contrast(s) tested
 perm_result$omnibus
 #> $effectSize
-#> [1] 1.824822
+#> [1] 2.087283
 #> 
 #> $pValue
-#> [1] 0.004975124
+#> [1] 0.001996008
 perm_result$contrasts
 #>                 contrastId effectSize      pValue       pAdj
-#> 2 Condition1_vs_Condition2   2.107850 0.004975124 0.01492537
-#> 3    Condition1_vs_Control   2.187775 0.004975124 0.01492537
-#> 4    Condition2_vs_Control   1.173828 0.049751244 0.04975124
+#> 2 Condition1_vs_Condition2   2.652343 0.003992016 0.01197605
+#> 3    Condition1_vs_Control   2.510626 0.003992016 0.01197605
+#> 4    Condition2_vs_Control   1.002185 0.375249501 0.37524950
 ```
 
 The printed `HellingerEnrichmentResult` summarizes the omnibus ratio and
 p-value. `perm_result$omnibus` holds the global effect size and
 unadjusted p-value; `perm_result$contrasts` holds all three pairwise
-contrasts with Holm-adjusted `pAdj` columns. Pairwise `contrastId`
-values follow sorted group-level order (`Condition1_vs_Control`,
-`Condition1_vs_Condition2`, `Condition2_vs_Control`). For the imposed
-enrichment, we expect `omnibus$effectSize > 1` and a small omnibus
-p-value, with `Condition1_vs_Control` (and often
-`Condition1_vs_Condition2`) carrying the enrichment, while
-`Condition2_vs_Control` remains near exchangeability ($`R \approx 1`$,
-large p-values).
+contrasts with Holm-adjusted `pAdj` columns, listed in the order the
+group-level pairs are generated: Condition1_vs_Condition2,
+Condition1_vs_Control, Condition2_vs_Control. The imposed enrichment
+shows up clearly at the omnibus level (effect size 2.09, p = 0.002) and
+in both `Condition1` contrasts, for example `Condition1_vs_Control` (R =
+2.51, pAdj = 0.012). `Condition2_vs_Control`, the arm we never modified,
+sits at R = 1.00 with pAdj = 0.38, consistent with exchangeability,
+exactly as expected for a group whose composition was never altered.
 
 ### Custom contrasts (and optional collapse)
 
@@ -333,7 +337,7 @@ identifiers for downstream tables.
 perm_custom <- CompareGroupCompositions(
   composition,
   method = "permutation",
-  nPermutations = 200,
+  nPermutations = 500,
   contrasts = list(
     condition1_vs_control = c("Control", "Condition1"),
     condition2_vs_control = c("Control", "Condition2")
@@ -343,11 +347,11 @@ perm_custom <- CompareGroupCompositions(
 
 perm_custom$contrasts
 #>                 contrastId effectSize      pValue       pAdj
-#> 2 Condition1_vs_Condition2   2.107850 0.004975124 0.02487562
-#> 3    Condition1_vs_Control   2.187775 0.004975124 0.02487562
-#> 4    Condition2_vs_Control   1.173828 0.049751244 0.09950249
-#> 5    condition1_vs_control   2.187775 0.004975124 0.02487562
-#> 6    condition2_vs_control   1.173828 0.049751244 0.09950249
+#> 2 Condition1_vs_Condition2   2.652343 0.003992016 0.01596806
+#> 3    Condition1_vs_Control   2.510626 0.003992016 0.01596806
+#> 4    Condition2_vs_Control   1.002185 0.375249501 0.75049900
+#> 5    condition1_vs_control   2.510626 0.001996008 0.00998004
+#> 6    condition2_vs_control   1.002185 0.395209581 0.75049900
 ```
 
 The named contrasts reproduce those pairwise comparisons under
@@ -377,28 +381,28 @@ bayes_result <- CompareGroupCompositions(
 
 bayes_result$omnibus
 #> $effectSize
-#> [1] 1.515218
+#> [1] 1.701271
 #> 
 #> $pValue
 #> [1] 0.01960784
 #> 
 #> $effectCiLow
-#> [1] 1.329332
+#> [1] 1.518504
 #> 
 #> $effectCiHigh
-#> [1] 1.767033
+#> [1] 1.927508
 bayes_result$contrasts
 #>                 contrastId effectSize     pValue effectCiLow effectCiHigh
-#> 2 Condition1_vs_Condition2   1.689622 0.02352941   1.4613561     1.984081
-#> 3    Condition1_vs_Control   1.798434 0.02254902   1.4917787     1.975221
-#> 4    Condition2_vs_Control   1.115472 0.19705882   0.9561683     1.303130
+#> 2 Condition1_vs_Condition2  2.1586237 0.02254902   1.8198996     2.439920
+#> 3    Condition1_vs_Control  2.0552451 0.02156863   1.5958373     2.550478
+#> 4    Condition2_vs_Control  0.9986326 0.49901961   0.9200667     1.093116
 #>         pAdj
-#> 2 0.06764706
-#> 3 0.06764706
-#> 4 0.19705882
+#> 2 0.06470588
+#> 3 0.06470588
+#> 4 0.49901961
 ```
 
-Interpretation differs slightly from permutation output.
+Reading the Bayes output requires one adjustment:
 `bayes_result$omnibus$effectSize` is the posterior mean of $`R`$, not
 the single observed ratio at the softened point estimate. The interval
 `effectCiLow`–`effectCiHigh` communicates whether $`R > 1`$ remains
@@ -442,31 +446,36 @@ contrasts.](hellinger-enrichment_files/figure-html/plot-bayes-1.png)
 
 Bayesian half-eye posterior densities for pairwise contrasts.
 
-The two panels therefore display the same ratio scale with
+The two panels display the same ratio scale, each with
 method-appropriate uncertainty. Permutation emphasizes discrete
 significance against the label null; Bayes overlays composition
 uncertainty on that same null via half-eye densities.
 
 ### Closing interpretation
 
-On the synthetic cohort, both approaches should recover the imposed
-`Condition1` enrichment in `Category0`: omnibus and
-`Condition1_vs_Control` ratios above 1, with permutation p-values and
-Bayesian intervals consistent with a real between-group shift rather
-than label noise. The `Condition2_vs_Control` contrast should remain
-near $`R \approx 1`$, illustrating that a significant omnibus result
-does not imply every pairwise group differs from Control. That pattern
-is expected here because the enrichment factor is large relative to
-multinomial sampling noise, Condition2 was never modified, and every
-subject contributes moderately dense counts across five categories.
+On this synthetic cohort, both approaches recover the imposed
+`Condition1` enrichment in `Category0`: the omnibus ratio and both
+`Condition1` contrasts sit well above 1, with permutation p-values and
+Bayesian intervals agreeing that the shift is real rather than label
+noise. `Condition2_vs_Control` behaves as expected for a group that was
+never modified, and the two methods agree on it: permutation returns R =
+1.00 with pAdj = 0.38, and the Bayesian interval spans 1 (0.92–1.09)
+with a posterior-mean p-value of 0.50. A significant omnibus result
+therefore does not imply that every pairwise group differs from Control.
 
-The result does not generalize to all real cohorts. Sparse categories,
+This result does not generalize to all real cohorts. Sparse categories,
 unequal cell yields, or violated exchangeability (for example, batch
 confounded with group) can produce ratios that look enriched under fixed
 compositions but fail to hold once Dirichlet uncertainty is propagated.
 In those settings, the Bayesian approach is the more conservative
 assessment of whether an apparent contrast survives sampling variation
-in the compositions themselves.
+in the compositions themselves. It is also worth remembering that
+permutation targets a fixed $`\alpha`$: a truly exchangeable group will
+cross a p \< 0.05 threshold by chance alone roughly one draw in twenty,
+so an isolated marginal p-value from a single permutation run is not, on
+its own, strong evidence against exchangeability—propagating composition
+uncertainty through the Bayesian option is one way to check whether such
+a signal is more than sampling noise.
 
 Two practical constraints bound any analysis. First, each group must
 include at least two subjects, because within-group distances are
