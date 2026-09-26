@@ -2,13 +2,12 @@
 % Please edit documentation in R/compare-group-compositions.R
 \name{run_bayes_enrichment}
 \alias{run_bayes_enrichment}
-\title{Execute Bayes enrichment with full nesting per posterior draw.}
+\title{Execute Bayes enrichment from Dirichlet posterior draws of R.}
 \usage{
 run_bayes_enrichment(
   composition,
   contrast_specs,
   n_posterior,
-  n_permutations,
   n_cores,
   prior_pseudocounts
 )

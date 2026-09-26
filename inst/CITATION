@@ -11,8 +11,7 @@ bibentry(
   note     = paste(
     "R package version 0.1.0.",
     "Hellinger between/within enrichment, Jeffreys softening, label permutation,",
-    "and collapse/subset contrasts follow methods developed by Paul Edlefsen;",
-    "nested Dirichlet Bayes implements his planned composition-uncertainty extension."
+    "and collapse/subset contrasts follow methods developed by Paul Edlefsen."
   ),
   url      = "https://github.com/GWMcElfresh/HellingerDistanceEnrichment"
 )

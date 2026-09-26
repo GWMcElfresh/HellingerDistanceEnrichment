@@ -7,8 +7,8 @@
 #' density slab needs samples rather than summarized `effectCiLow`/`effectCiHigh`
 #' intervals. Permutation results have no draws, so they render as points
 #' colored by adjusted significance. When `showOmnibus` is TRUE, the omnibus
-#' ratio is overlaid as a dashed reference with its p-value labeled beside the
-#' line.
+#' ratio is overlaid as a dashed reference with its p-value (permutation) or
+#' PPGT1 (Bayes) labeled beside the line.
 #'
 #' @param result A HellingerEnrichmentResult from CompareGroupCompositions.
 #' @param theme ggplot2 theme (default egg::theme_article()).
@@ -32,7 +32,6 @@ PlotCompositionContrasts <- function(result,
 
     contrast_levels <- rev(plot_data$contrastId)
     plot_data$contrastId <- factor(plot_data$contrastId, levels = contrast_levels)
-    plot_data$significant <- plot_data$pAdj < 0.05
 
     if (result$method == "bayes") {
         # Half-eye needs one effectSize per posterior draw; summarized CI
@@ -50,6 +49,7 @@ PlotCompositionContrasts <- function(result,
         ) +
             ggdist::stat_halfeye(...)
     } else {
+        plot_data$significant <- plot_data$pAdj < 0.05
         p <- ggplot2::ggplot(
             plot_data,
             ggplot2::aes(x = .data$effectSize, y = .data$contrastId)
@@ -91,7 +91,11 @@ PlotCompositionContrasts <- function(result,
                 # Discrete contrast levels start at 1; 0.5 sits just below the
                 # lowest row without overlapping contrast labels.
                 y = 0.5,
-                label = sprintf("omnibus (p=%.3f)", result$omnibus$pValue),
+                label = if (identical(result$method, "bayes")) {
+                    sprintf("omnibus (PPGT1=%.3f)", result$omnibus$PPGT1)
+                } else {
+                    sprintf("omnibus (p=%.3f)", result$omnibus$pValue)
+                },
                 hjust = -0.05,
                 size = 3,
                 color = "#009E73"

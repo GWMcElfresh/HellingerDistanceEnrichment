@@ -10,12 +10,11 @@ ratios with permutation or conjugate Bayesian posterior-predictive inference.
 
 The enrichment ratio, Jeffreys softening, label-permutation null, and
 collapse/subset contrasts follow methods developed by Paul Edlefsen. The
-nested Dirichlet Bayes option implements his planned extension that
-propagates uncertainty in estimated simplex compositions.
+Dirichlet Bayes option instead draws subject compositions from a conjugate
+posterior so composition uncertainty is not treated as fixed.
 }
 \references{
-Edlefsen, P. Original Hellinger between/within enrichment procedure for
-subject-level categorical compositions (label permutation; Jeffreys-softened
-Hellinger distances), with Bayesian composition uncertainty as a subsequent
-step.
+Edlefsen, P. Hellinger between/within enrichment for subject-level
+categorical compositions (Jeffreys softening, ratio statistic, label
+permutation, collapse/subset contrasts).
 }
