@@ -161,10 +161,19 @@ main <- function() {
     saveRDS(result, file.path(opts$output_dir, "hellinger_result.rds"))
     write.csv(result$contrasts, file.path(opts$output_dir, "contrasts.csv"), row.names = FALSE)
 
-    omnibus_df <- data.frame(
-        effectSize = result$omnibus$effectSize,
-        pValue = result$omnibus$pValue
-    )
+    omnibus_df <- if (identical(result$method, "bayes")) {
+        data.frame(
+            effectSize = result$omnibus$effectSize,
+            PPGT1 = result$omnibus$PPGT1,
+            effectCiLow = result$omnibus$effectCiLow,
+            effectCiHigh = result$omnibus$effectCiHigh
+        )
+    } else {
+        data.frame(
+            effectSize = result$omnibus$effectSize,
+            pValue = result$omnibus$pValue
+        )
+    }
     write.csv(omnibus_df, file.path(opts$output_dir, "omnibus.csv"), row.names = FALSE)
 
     if (isTRUE(opts$plot)) {

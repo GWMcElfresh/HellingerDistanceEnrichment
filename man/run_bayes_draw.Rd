@@ -2,11 +2,11 @@
 % Please edit documentation in R/compare-group-compositions.R
 \name{run_bayes_draw}
 \alias{run_bayes_draw}
-\title{One Bayes draw: sample compositions, rebuild distances, nested permutation null.}
+\title{One Bayes draw: sample compositions and rebuild the Hellinger ratio.}
 \usage{
-run_bayes_draw(counts, group, spec, n_permutations, prior_pseudocounts)
+run_bayes_draw(counts, group, spec, prior_pseudocounts)
 }
 \description{
-One Bayes draw: sample compositions, rebuild distances, nested permutation null.
+One Bayes draw: sample compositions and rebuild the Hellinger ratio.
 }
 \keyword{internal}

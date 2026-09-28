@@ -141,7 +141,7 @@ test_that("plant_group_structure rejects unknown group or category", {
     )
 })
 
-test_that("Bayes nesting smoke test returns finite posterior-mean p", {
+test_that("Bayes smoke test returns finite PPGT1", {
     long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
         n_subjects_per_group = 5,
         n_categories = 4,
@@ -152,19 +152,43 @@ test_that("Bayes nesting smoke test returns finite posterior-mean p", {
         long_table,
         method = "bayes",
         nPosterior = 5,
-        nPermutations = 20,
         nCores = 1,
         seed = 55
     )
 
     expect_s3_class(result, "HellingerEnrichmentResult")
-    expect_true(is.finite(result$omnibus$pValue))
-    expect_true(all(is.finite(result$contrasts$pValue)))
+    expect_true(is.finite(result$omnibus$PPGT1))
+    expect_true(result$omnibus$PPGT1 >= 0 && result$omnibus$PPGT1 <= 1)
+    expect_true(all(is.finite(result$contrasts$PPGT1)))
+    expect_true(all(result$contrasts$PPGT1 >= 0 & result$contrasts$PPGT1 <= 1))
+    expect_false("pValue" %in% names(result$contrasts))
+    expect_false("pAdj" %in% names(result$contrasts))
+    expect_null(result$omnibus$pValue)
     expect_true(all(is.finite(result$contrasts$effectCiLow)))
     expect_true(!is.null(result$draws))
     expect_gt(nrow(result$draws), 0)
     expect_true(all(c("contrastId", "draw", "effectSize") %in% colnames(result$draws)))
     expect_false("omnibus" %in% result$draws$contrastId)
+})
+
+test_that("Bayes warns when unused permutation arguments are non-default", {
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 4,
+        n_categories = 3,
+        seed = 12
+    )
+
+    expect_warning(
+        CompareGroupCompositions(
+            long_table,
+            method = "bayes",
+            nPosterior = 3,
+            nPermutations = 20,
+            nCores = 1,
+            seed = 1
+        ),
+        "nPermutations"
+    )
 })
 
 test_that("Holm adjustment is monotonic on contrasts", {
@@ -224,7 +248,6 @@ test_that("PlotCompositionContrasts uses halfeye for Bayes result", {
         long_table,
         method = "bayes",
         nPosterior = 5,
-        nPermutations = 10,
         nCores = 1,
         seed = 8
     )
@@ -246,6 +269,27 @@ test_that("custom contrast subset runs", {
         seed = 6
     )
     expect_true("pair_only" %in% result$contrasts$contrastId)
+})
+
+test_that("packaged h5ad extracts to CategoryComposition", {
+    skip_if_not_installed("anndata")
+    h5ad_path <- system.file(
+        "extdata", "tiny_obs.h5ad",
+        package = "HellingerDistanceEnrichment"
+    )
+    skip_if_not(nzchar(h5ad_path) && file.exists(h5ad_path))
+    adata <- try(anndata::read_h5ad(h5ad_path), silent = TRUE)
+    skip_if(inherits(adata, "try-error"), "Python anndata/read_h5ad unavailable")
+
+    composition <- ExtractClusterComposition(
+        adata,
+        subjectCol = "subjectId",
+        categoryCol = "category",
+        groupCol = "group"
+    )
+    expect_s3_class(composition, "CategoryComposition")
+    expect_equal(length(composition$subjectIds), 4)
+    expect_setequal(as.character(composition$group), c("A", "B"))
 })
 
 test_that("subject with multiple groups errors", {

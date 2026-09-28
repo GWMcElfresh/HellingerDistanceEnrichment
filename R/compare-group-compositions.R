@@ -7,9 +7,10 @@
 #'
 #' The between/within Hellinger ratio, Jeffreys softening, observed-inclusive
 #' label-permutation p-value, and collapse/subset contrasts follow Paul
-#' Edlefsen's original procedure. `method = "bayes"` implements his outlined
-#' next step: nest Dirichlet draws of subject compositions inside that same
-#' permutation null so composition uncertainty is not treated as fixed.
+#' Edlefsen's original procedure. `method = "bayes"` instead draws subject
+#' compositions from a conjugate Dirichlet posterior, rebuilds the Hellinger
+#' ratio \(R\) on each draw, and reports the posterior probability that
+#' \(R > 1\) (`PPGT1`).
 #'
 #' @param x A CategoryComposition object or long counts table.
 #' @param method Inference method: `"permutation"` or `"bayes"`.
@@ -17,21 +18,19 @@
 #'   element may be a length-2 character vector of group levels (pairwise subset)
 #'   or a list with `collapse` (named remap of group levels) and/or `groups`
 #'   (subset to these levels before testing).
-#' @param nPermutations Number of label permutations (permutation method).
+#' @param nPermutations Number of label permutations (permutation method only).
 #' @param nPosterior Number of posterior draws (bayes method).
 #' @param nCores Number of parallel workers (default 1).
 #' @param seed Random seed for reproducibility.
 #' @param priorPseudocounts Jeffreys prior increment per category (default 1/2).
-#' @param pAdjustMethod Multiple-testing adjustment for contrasts (`"holm"`, `"BH"`, `"none"`).
+#' @param pAdjustMethod Multiple-testing adjustment for permutation contrasts (`"holm"`, `"BH"`, `"none"`). Ignored for Bayes.
 #' @param ... Ignored.
 #' @return A HellingerEnrichmentResult with omnibus summary, pairwise
 #'   `contrasts`, and (Bayes only) long-format posterior `draws` for plotting.
 #' @references
-#' Edlefsen, P. Original Hellinger between/within enrichment procedure for
-#' subject-level categorical compositions, including Jeffreys softening, the
-#' between/within ratio statistic, label permutation, and collapse/subset
-#' contrasts. Bayesian nesting of composition uncertainty was his planned
-#' extension beyond fixed-composition permutation.
+#' Edlefsen, P. Hellinger between/within enrichment for subject-level
+#' categorical compositions (Jeffreys softening, ratio statistic, label
+#' permutation, collapse/subset contrasts).
 #' @export
 CompareGroupCompositions <- function(x,
                                      method = c("permutation", "bayes"),
@@ -44,6 +43,25 @@ CompareGroupCompositions <- function(x,
                                      pAdjustMethod = "holm",
                                      ...) {
     method <- match.arg(method)
+
+    if (method == "bayes") {
+        unused <- character()
+        if (nPermutations != 1000) {
+            unused <- c(unused, "nPermutations")
+        }
+        if (pAdjustMethod != "holm") {
+            unused <- c(unused, "pAdjustMethod")
+        }
+        if (length(unused) > 0) {
+            warning(
+                sprintf(
+                    "%s unused for method = \"bayes\"; ignored",
+                    paste(unused, collapse = " and ")
+                ),
+                call. = FALSE
+            )
+        }
+    }
 
     composition <- if (inherits(x, "CategoryComposition")) {
         x
@@ -77,17 +95,18 @@ CompareGroupCompositions <- function(x,
             composition = composition,
             contrast_specs = contrast_specs,
             n_posterior = nPosterior,
-            n_permutations = nPermutations,
             n_cores = nCores,
             prior_pseudocounts = priorPseudocounts
         )
     }
 
     contrasts_df <- result_body$contrasts
-    if (nrow(contrasts_df) > 0 && pAdjustMethod != "none") {
-        contrasts_df$pAdj <- stats::p.adjust(contrasts_df$pValue, method = pAdjustMethod)
-    } else {
-        contrasts_df$pAdj <- contrasts_df$pValue
+    if (method == "permutation") {
+        if (nrow(contrasts_df) > 0 && pAdjustMethod != "none") {
+            contrasts_df$pAdj <- stats::p.adjust(contrasts_df$pValue, method = pAdjustMethod)
+        } else {
+            contrasts_df$pAdj <- contrasts_df$pValue
+        }
     }
 
     structure(
@@ -129,12 +148,21 @@ validate_composition_for_inference <- function(composition) {
 
 #' @export
 print.HellingerEnrichmentResult <- function(x, ...) {
-    cat(sprintf(
-        "HellingerEnrichmentResult (%s): omnibus effectSize=%.4f, pValue=%.4f\n",
-        x$method,
-        x$omnibus$effectSize,
-        x$omnibus$pValue
-    ))
+    if (identical(x$method, "bayes")) {
+        cat(sprintf(
+            "HellingerEnrichmentResult (%s): omnibus effectSize=%.4f, PPGT1=%.4f\n",
+            x$method,
+            x$omnibus$effectSize,
+            x$omnibus$PPGT1
+        ))
+    } else {
+        cat(sprintf(
+            "HellingerEnrichmentResult (%s): omnibus effectSize=%.4f, pValue=%.4f\n",
+            x$method,
+            x$omnibus$effectSize,
+            x$omnibus$pValue
+        ))
+    }
     cat(sprintf("  %d contrast(s) tested\n", nrow(x$contrasts)))
     invisible(x)
 }
@@ -334,9 +362,9 @@ run_permutation_enrichment <- function(composition, contrast_specs, n_permutatio
     )
 }
 
-#' One Bayes draw: sample compositions, rebuild distances, nested permutation null.
+#' One Bayes draw: sample compositions and rebuild the Hellinger ratio.
 #' @keywords internal
-run_bayes_draw <- function(counts, group, spec, n_permutations, prior_pseudocounts) {
+run_bayes_draw <- function(counts, group, spec, prior_pseudocounts) {
     subset_data <- subset_for_contrast(counts, group, spec)
     draw_matrix <- sample_dirichlet_compositions(subset_data$counts, prior_pseudocounts)
     dist_matrix <- build_distance_matrix_from_draw(draw_matrix)
@@ -345,27 +373,17 @@ run_bayes_draw <- function(counts, group, spec, n_permutations, prior_pseudocoun
     summary_matrix <- build_group_distance_summary_matrix(contrast_group, dist_matrix)
     observed_ratio <- compute_between_within_ratio(summary_matrix)
 
-    permuted_ratios <- vapply(seq_len(n_permutations), function(perm_idx) {
-        shuffled_group <- sample(contrast_group)
-        names(shuffled_group) <- names(contrast_group)
-        perm_summary <- build_group_distance_summary_matrix(shuffled_group, dist_matrix)
-        compute_between_within_ratio(perm_summary)
-    }, FUN.VALUE = numeric(1))
-
-    list(
-        effectSize = observed_ratio,
-        pValue = permutation_p_value(observed_ratio, permuted_ratios)
-    )
+    list(effectSize = observed_ratio)
 }
 
-#' Execute Bayes enrichment with full nesting per posterior draw.
+#' Execute Bayes enrichment from Dirichlet posterior draws of R.
 #'
 #' For each contrast, returns both a one-row posterior summary and the long
 #' draw table used by half-eye plots. Draw storage scales as
 #' `n_posterior * n_contrasts` effect sizes (omnibus excluded from the returned
 #' `draws`, matching `contrasts`).
 #' @keywords internal
-run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_permutations, n_cores, prior_pseudocounts) {
+run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_cores, prior_pseudocounts) {
     counts <- composition$counts
     group <- composition$group
     contrast_names <- names(contrast_specs)
@@ -376,7 +394,7 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
 
         draw_indices <- seq_len(n_posterior)
         compute_draw <- function(draw_idx) {
-            run_bayes_draw(counts, group, spec, n_permutations, prior_pseudocounts)
+            run_bayes_draw(counts, group, spec, prior_pseudocounts)
         }
 
         if (n_cores > 1) {
@@ -386,7 +404,6 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
         }
 
         effect_sizes <- vapply(draw_results, function(x) x$effectSize, numeric(1))
-        p_values <- vapply(draw_results, function(x) x$pValue, numeric(1))
 
         ci_quantiles <- stats::quantile(
             effect_sizes,
@@ -398,7 +415,7 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
         summary_row <- data.frame(
             contrastId = spec$contrastId,
             effectSize = mean(effect_sizes),
-            pValue = mean(p_values),
+            PPGT1 = mean(effect_sizes > 1),
             effectCiLow = ci_quantiles[1],
             effectCiHigh = ci_quantiles[2],
             stringsAsFactors = FALSE
@@ -435,12 +452,12 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_per
     list(
         omnibus = list(
             effectSize = omnibus_row$effectSize[1],
-            pValue = omnibus_row$pValue[1],
+            PPGT1 = omnibus_row$PPGT1[1],
             effectCiLow = omnibus_row$effectCiLow[1],
             effectCiHigh = omnibus_row$effectCiHigh[1]
         ),
         contrasts = contrast_only,
         draws = draws_only,
-        diagnostics = list(nPosterior = n_posterior, nPermutations = n_permutations)
+        diagnostics = list(nPosterior = n_posterior)
     )
 }

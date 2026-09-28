@@ -87,18 +87,18 @@ Paul Edlefsen developed the original Hellinger enrichment procedure: Jeffreys
 softening of subject-level counts, pairwise Hellinger distances on the simplex,
 the between/within mean-distance ratio as the effect size, label permutation with
 an observed-inclusive p-value, and collapse/subset contrasts. This package
-implements that procedure and extends it.
+implements that procedure.
 
 - **Permutation:** shuffle group labels on a fixed (softened) distance matrix; p-value includes the observed ratio (workbook style).
-- **Bayes:** for each Dirichlet posterior draw of subject compositions, run a full nested permutation null; report the posterior mean p-value and effect-size credible intervals.
+- **Bayes:** draw subject compositions from a conjugate Dirichlet posterior; report the posterior probability that \(R > 1\) (abbreviated `PPGT1`) and effect-size credible intervals.
 
-Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted.
+Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Permutation contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted. Bayes reports `PPGT1`.
 
 ## Acknowledgments
 
-Statistical methods for Hellinger-distance enrichment of categorical compositions
-were developed by Paul Edlefsen. Package implementation, documentation, and
-interfaces are by GW McElfresh.
+The original Hellinger between/within enrichment procedure was developed by
+Paul Edlefsen. Package implementation, documentation, and interfaces are by
+GW McElfresh.
 
 ## License
 

@@ -227,7 +227,7 @@ Do **not** prioritize continuous Hellinger-disparity BNP hybrids for this multin
 
 **Baseline / package**
 
-- Edlefsen, P. Original Hellinger between/within enrichment procedure (Jeffreys softening, ratio statistic, label permutation, collapse/subset contrasts); nested Dirichlet Bayes as planned composition-uncertainty extension. Implemented in `HellingerDistanceEnrichment`.
+- Edlefsen, P. Hellinger between/within enrichment procedure (Jeffreys softening, ratio statistic, label permutation, collapse/subset contrasts). Implemented in `HellingerDistanceEnrichment`.
 
 **Wilcox / WRS2**
 
