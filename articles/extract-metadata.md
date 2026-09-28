@@ -160,18 +160,31 @@ exist. Once those names are aligned with the object at hand, the
 resulting `CategoryComposition` is interchangeable with one derived from
 Seurat.
 
+This example loads a packaged `.h5ad` with
+[`anndata::read_h5ad()`](https://anndata.dynverse.org/reference/read_h5ad.html),
+the same path as the command-line workflow. Prefer reading a file over
+[`anndata::AnnData()`](https://anndata.dynverse.org/reference/AnnData.html)
+for in-memory construction: the CRAN wrapper still passes `dtype=`,
+which Python anndata 0.11 and later reject.
+
 ``` r
 
-if (requireNamespace("anndata", quietly = TRUE)) {
-  obs <- data.frame(
-    subjectId = rep(paste0("S", 1:4), each = 15),
-    category = sample(paste0("Type", 0:2), 60, replace = TRUE),
-    group = rep(c("A", "A", "B", "B"), each = 15),
-    stringsAsFactors = FALSE
-  )
-  X <- matrix(stats::rnorm(60 * 10), nrow = 60)
-  adata <- anndata::AnnData(X = X, obs = obs)
+library(HellingerDistanceEnrichment)
 
+h5ad_path <- system.file(
+  "extdata", "tiny_obs.h5ad",
+  package = "HellingerDistanceEnrichment"
+)
+adata <- try({
+  if (!nzchar(h5ad_path)) {
+    stop("tiny_obs.h5ad not installed with the package")
+  }
+  anndata::read_h5ad(h5ad_path)
+}, silent = TRUE)
+
+if (inherits(adata, "try-error")) {
+  message("Could not read h5ad (Python anndata unavailable); skipping anndata example.")
+} else {
   composition <- ExtractClusterComposition(
     adata,
     subjectCol = "subjectId",
@@ -184,11 +197,9 @@ if (requireNamespace("anndata", quietly = TRUE)) {
     nPermutations = 30,
     seed = 2
   )$omnibus
-} else {
-  message("anndata not installed; skipping anndata example.")
 }
 #> $effectSize
-#> [1] 0.997142
+#> [1] 1
 #> 
 #> $pValue
 #> [1] 1

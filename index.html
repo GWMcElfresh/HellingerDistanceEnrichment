@@ -125,19 +125,19 @@
 <div class="section level2">
 <h2 id="methods">Methods<a class="anchor" aria-label="anchor" href="#methods"></a>
 </h2>
-<p>Paul Edlefsen developed the original Hellinger enrichment procedure: Jeffreys softening of subject-level counts, pairwise Hellinger distances on the simplex, the between/within mean-distance ratio as the effect size, label permutation with an observed-inclusive p-value, and collapse/subset contrasts. This package implements that procedure and extends it.</p>
+<p>Paul Edlefsen developed the original Hellinger enrichment procedure: Jeffreys softening of subject-level counts, pairwise Hellinger distances on the simplex, the between/within mean-distance ratio as the effect size, label permutation with an observed-inclusive p-value, and collapse/subset contrasts. This package implements that procedure.</p>
 <ul>
 <li>
 <strong>Permutation:</strong> shuffle group labels on a fixed (softened) distance matrix; p-value includes the observed ratio (workbook style).</li>
 <li>
-<strong>Bayes:</strong> for each Dirichlet posterior draw of subject compositions, run a full nested permutation null; report the posterior mean p-value and effect-size credible intervals.</li>
+<strong>Bayes:</strong> draw subject compositions from a conjugate Dirichlet posterior; report the posterior probability that (R &gt; 1) (abbreviated <code>PPGT1</code>) and effect-size credible intervals.</li>
 </ul>
-<p>Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted.</p>
+<p>Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Permutation contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted. Bayes reports <code>PPGT1</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="acknowledgments">Acknowledgments<a class="anchor" aria-label="anchor" href="#acknowledgments"></a>
 </h2>
-<p>Statistical methods for Hellinger-distance enrichment of categorical compositions were developed by Paul Edlefsen. Package implementation, documentation, and interfaces are by GW McElfresh.</p>
+<p>The original Hellinger between/within enrichment procedure was developed by Paul Edlefsen. Package implementation, documentation, and interfaces are by GW McElfresh.</p>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>

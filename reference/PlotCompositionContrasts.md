@@ -9,7 +9,8 @@ because a density slab needs samples rather than summarized
 `effectCiLow`/`effectCiHigh` intervals. Permutation results have no
 draws, so they render as points colored by adjusted significance. When
 `showOmnibus` is TRUE, the omnibus ratio is overlaid as a dashed
-reference with its p-value labeled beside the line.
+reference with its p-value (permutation) or PPGT1 (Bayes) labeled beside
+the line.
 
 ## Usage
 

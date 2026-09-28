@@ -86,7 +86,7 @@ or a list with <code>collapse</code> (named remap of group levels) and/or <code>
 
 
 <dt id="arg-npermutations">nPermutations<a class="anchor" aria-label="anchor" href="#arg-npermutations"></a></dt>
-<dd><p>Number of label permutations (permutation method).</p></dd>
+<dd><p>Number of label permutations (permutation method only).</p></dd>
 
 
 <dt id="arg-nposterior">nPosterior<a class="anchor" aria-label="anchor" href="#arg-nposterior"></a></dt>
@@ -106,7 +106,7 @@ or a list with <code>collapse</code> (named remap of group levels) and/or <code>
 
 
 <dt id="arg-padjustmethod">pAdjustMethod<a class="anchor" aria-label="anchor" href="#arg-padjustmethod"></a></dt>
-<dd><p>Multiple-testing adjustment for contrasts (<code>"holm"</code>, <code>"BH"</code>, <code>"none"</code>).</p></dd>
+<dd><p>Multiple-testing adjustment for permutation contrasts (<code>"holm"</code>, <code>"BH"</code>, <code>"none"</code>). Ignored for Bayes.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -122,17 +122,16 @@ or a list with <code>collapse</code> (named remap of group levels) and/or <code>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The between/within Hellinger ratio, Jeffreys softening, observed-inclusive
 label-permutation p-value, and collapse/subset contrasts follow Paul
-Edlefsen's original procedure. <code>method = "bayes"</code> implements his outlined
-next step: nest Dirichlet draws of subject compositions inside that same
-permutation null so composition uncertainty is not treated as fixed.</p>
+Edlefsen's original procedure. <code>method = "bayes"</code> instead draws subject
+compositions from a conjugate Dirichlet posterior, rebuilds the Hellinger
+ratio \(R\) on each draw, and reports the posterior probability that
+\(R &gt; 1\) (<code>PPGT1</code>).</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>Edlefsen, P. Original Hellinger between/within enrichment procedure for
-subject-level categorical compositions, including Jeffreys softening, the
-between/within ratio statistic, label permutation, and collapse/subset
-contrasts. Bayesian nesting of composition uncertainty was his planned
-extension beyond fixed-composition permutation.</p>
+    <p>Edlefsen, P. Hellinger between/within enrichment for subject-level
+categorical compositions (Jeffreys softening, ratio statistic, label
+permutation, collapse/subset contrasts).</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

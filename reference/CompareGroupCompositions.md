@@ -42,7 +42,7 @@ CompareGroupCompositions(
 
 - nPermutations:
 
-  Number of label permutations (permutation method).
+  Number of label permutations (permutation method only).
 
 - nPosterior:
 
@@ -62,8 +62,8 @@ CompareGroupCompositions(
 
 - pAdjustMethod:
 
-  Multiple-testing adjustment for contrasts (`"holm"`, `"BH"`,
-  `"none"`).
+  Multiple-testing adjustment for permutation contrasts (`"holm"`,
+  `"BH"`, `"none"`). Ignored for Bayes.
 
 - ...:
 
@@ -79,14 +79,12 @@ and (Bayes only) long-format posterior `draws` for plotting.
 The between/within Hellinger ratio, Jeffreys softening,
 observed-inclusive label-permutation p-value, and collapse/subset
 contrasts follow Paul Edlefsen's original procedure. `method = "bayes"`
-implements his outlined next step: nest Dirichlet draws of subject
-compositions inside that same permutation null so composition
-uncertainty is not treated as fixed.
+instead draws subject compositions from a conjugate Dirichlet posterior,
+rebuilds the Hellinger ratio \\R\\ on each draw, and reports the
+posterior probability that \\R \> 1\\ (`PPGT1`).
 
 ## References
 
-Edlefsen, P. Original Hellinger between/within enrichment procedure for
-subject-level categorical compositions, including Jeffreys softening,
-the between/within ratio statistic, label permutation, and
-collapse/subset contrasts. Bayesian nesting of composition uncertainty
-was his planned extension beyond fixed-composition permutation.
+Edlefsen, P. Hellinger between/within enrichment for subject-level
+categorical compositions (Jeffreys softening, ratio statistic, label
+permutation, collapse/subset contrasts).

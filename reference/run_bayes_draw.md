@@ -1,10 +1,9 @@
-# One Bayes draw: sample compositions, rebuild distances, nested permutation null.
+# One Bayes draw: sample compositions and rebuild the Hellinger ratio.
 
-One Bayes draw: sample compositions, rebuild distances, nested
-permutation null.
+One Bayes draw: sample compositions and rebuild the Hellinger ratio.
 
 ## Usage
 
 ``` r
-run_bayes_draw(counts, group, spec, n_permutations, prior_pseudocounts)
+run_bayes_draw(counts, group, spec, prior_pseudocounts)
 ```

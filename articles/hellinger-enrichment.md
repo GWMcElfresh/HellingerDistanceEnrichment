@@ -21,9 +21,9 @@ comparisons are statistically different.
 The inferential core below—Hellinger geometry on Jeffreys-softened
 subject compositions, the between/within distance ratio $`R`$,
 observed-inclusive label permutation, and collapse/subset
-contrasts—follows methods developed by Paul Edlefsen. The nested
-Dirichlet Bayes option implements the composition-uncertainty step he
-outlined beyond fixed-composition permutation.
+contrasts—follows methods developed by Paul Edlefsen. The Dirichlet
+Bayes option instead draws subject compositions from a conjugate
+posterior so composition uncertainty is not treated as fixed.
 
 ### What is composition enrichment?
 
@@ -50,11 +50,11 @@ dominate the apparent pattern.
 This package tests enrichment by comparing the average pairwise
 Hellinger distance between subjects in different groups to the average
 pairwise distance between subjects in the same group. The output is an
-effect-size ratio and a p-value: from label permutation on fixed
-compositions, or, under the Bayesian option, from a permutation null
-averaged across posterior composition draws. Either way, the package
-breaks the result down into an omnibus summary and contrast-specific
-results.
+effect-size ratio plus a p-value from label permutation on fixed
+compositions, or, under the Bayesian option, the posterior probability
+that the ratio exceeds 1 (`PPGT1`) from Dirichlet composition draws.
+Either way, the package breaks the result down into an omnibus summary
+and contrast-specific results.
 
 ### Why Hellinger distance?
 
@@ -145,13 +145,15 @@ groups (subset), or a remapped grouping (collapse). Custom contrasts are
 passed as a **named list** to `contrasts=`; names become `contrastId`
 values in the result.
 
-Two levels of p-value reporting matter in practice:
+Two levels of reporting matter in practice:
 
-- **`result$omnibus$pValue`**: unadjusted p-value for the global
-  between/within ratio across all groups.
-- **`result$contrasts$pValue` and `pAdj`**: contrast-specific p-values,
-  with `pAdj` applying Holm adjustment across the contrast table by
-  default (`pAdjustMethod = "holm"`).
+- **Permutation:** `result$omnibus$pValue` is the unadjusted p-value for
+  the global between/within ratio; `result$contrasts$pValue` and `pAdj`
+  are contrast-specific, with `pAdj` applying Holm adjustment across the
+  contrast table by default (`pAdjustMethod = "holm"`).
+- **Bayes:** `result$omnibus$PPGT1` and `result$contrasts$PPGT1` are the
+  posterior probability that $`R > 1`$. There is no `pAdj`;
+  `pAdjustMethod` is unused.
 
 Omnibus and pairwise contrasts answer nested questions. A significant
 omnibus result indicates that at least some group separation exists
@@ -161,7 +163,7 @@ omnibus line.
 
 ### Permutation vs Bayes: related but non-equivalent questions
 
-Both methods use label shuffling to define a null, but they differ in
+Both methods use the same between/within ratio $`R`$, but they differ in
 whether composition vectors are treated as fixed.
 
 **Permutation (`method = "permutation"`).** Compositions are estimated
@@ -187,19 +189,17 @@ p_s \sim \mathrm{Dirichlet}(c_{s\cdot} + \alpha),
 ```
 
 where $`c_{s\cdot}`$ is the count vector for subject $`s`$. A full
-Hellinger distance matrix is rebuilt from that draw, and a nested
-permutation null (same label shuffles, `nPermutations` per draw) yields
-$`R`$ and a draw-specific p-value. Across `nPosterior` draws, the
-package reports:
+Hellinger distance matrix is rebuilt from that draw and $`R`$ is
+recomputed. Across `nPosterior` draws, the package reports:
 
 - posterior-mean $`R`$ (`effectSize`),
-- posterior-mean p-value (`pValue`),
+- posterior probability that $`R > 1`$ (`PPGT1`),
 - 95% credible interval on $`R`$ (`effectCiLow`, `effectCiHigh`).
 
-By sampling compositions before permuting labels, the Bayesian approach
-nests composition uncertainty inside the label-exchange null. When
-counts are sparse, that nesting can widen credible intervals or inflate
-mean p-values relative to plain permutation, even when point ratios look
+By sampling compositions rather than fixing them, the Bayesian approach
+propagates multinomial uncertainty into $`R`$. When counts are sparse,
+that can widen credible intervals or lower `PPGT1` relative to a
+permutation p-value on the point estimate, even when point ratios look
 similar. When counts are dense and the imposed enrichment is strong, as
 in the synthetic example below, the two approaches often agree on which
 contrasts are elevated, though they still answer formally different
@@ -366,8 +366,8 @@ for the `collapse` argument.
 
 The Bayesian method reuses the same contrast specifications but replaces
 fixed compositions with Dirichlet posterior draws. For vignette
-execution time, keep `nPosterior` and `nPermutations` small; production
-analyses should raise both so posterior means and intervals stabilize.
+execution time, keep `nPosterior` small; production analyses should
+raise it so posterior means and intervals stabilize.
 
 ``` r
 
@@ -375,31 +375,26 @@ bayes_result <- CompareGroupCompositions(
   composition,
   method = "bayes",
   nPosterior = 20,
-  nPermutations = 50,
   seed = 42
 )
 
 bayes_result$omnibus
 #> $effectSize
-#> [1] 1.701271
+#> [1] 1.713524
 #> 
-#> $pValue
-#> [1] 0.01960784
+#> $PPGT1
+#> [1] 1
 #> 
 #> $effectCiLow
-#> [1] 1.518504
+#> [1] 1.562867
 #> 
 #> $effectCiHigh
-#> [1] 1.927508
+#> [1] 1.904499
 bayes_result$contrasts
-#>                 contrastId effectSize     pValue effectCiLow effectCiHigh
-#> 2 Condition1_vs_Condition2  2.1586237 0.02254902   1.8198996     2.439920
-#> 3    Condition1_vs_Control  2.0552451 0.02156863   1.5958373     2.550478
-#> 4    Condition2_vs_Control  0.9986326 0.49901961   0.9200667     1.093116
-#>         pAdj
-#> 2 0.06470588
-#> 3 0.06470588
-#> 4 0.49901961
+#>                 contrastId effectSize PPGT1 effectCiLow effectCiHigh
+#> 2 Condition1_vs_Condition2  2.1210626   1.0   1.7696895     2.521843
+#> 3    Condition1_vs_Control  1.9727319   1.0   1.6681298     2.332215
+#> 4    Condition2_vs_Control  0.9799171   0.3   0.9089024     1.048363
 ```
 
 Reading the Bayes output requires one adjustment:
@@ -407,11 +402,10 @@ Reading the Bayes output requires one adjustment:
 the single observed ratio at the softened point estimate. The interval
 `effectCiLow`–`effectCiHigh` communicates whether $`R > 1`$ remains
 stable under composition uncertainty. When the credible interval
-excludes 1, enrichment is supported even if the posterior-mean p-value
-is moderated by label shuffling within each draw. When the interval
-spans 1 but permutation p-values are small, sparse counts may be driving
-a fixed-composition signal that the Bayesian procedure correctly
-weakens.
+excludes 1, enrichment is supported and `PPGT1` is typically near 1.
+When the interval spans 1 but permutation p-values are small, sparse
+counts may be driving a fixed-composition signal that the Bayesian
+procedure correctly weakens.
 
 ### Plot contrasts
 
@@ -419,8 +413,9 @@ weakens.
 visualizes contrast-level effect sizes. A dotted vertical line at
 $`R = 1`$ marks the exchangeability reference under this metric. When
 `showOmnibus = TRUE` (default), the omnibus posterior-mean or observed
-ratio appears as a dashed reference with its p-value annotated—contrasts
-can then be read against both unity and the global summary.
+ratio appears as a dashed reference with its p-value (permutation) or
+`PPGT1` (Bayes) annotated—contrasts can then be read against both unity
+and the global summary.
 
 ``` r
 
@@ -449,7 +444,7 @@ Bayesian half-eye posterior densities for pairwise contrasts.
 The two panels display the same ratio scale, each with
 method-appropriate uncertainty. Permutation emphasizes discrete
 significance against the label null; Bayes overlays composition
-uncertainty on that same null via half-eye densities.
+uncertainty via half-eye densities of $`R`$.
 
 ### Closing interpretation
 
@@ -459,9 +454,9 @@ On this synthetic cohort, both approaches recover the imposed
 Bayesian intervals agreeing that the shift is real rather than label
 noise. `Condition2_vs_Control` behaves as expected for a group that was
 never modified, and the two methods agree on it: permutation returns R =
-1.00 with pAdj = 0.38, and the Bayesian interval spans 1 (0.92–1.09)
-with a posterior-mean p-value of 0.50. A significant omnibus result
-therefore does not imply that every pairwise group differs from Control.
+1.00 with pAdj = 0.38, and the Bayesian interval spans 1 (0.91–1.05)
+with PPGT1 = 0.30. A significant omnibus result therefore does not imply
+that every pairwise group differs from Control.
 
 This result does not generalize to all real cohorts. Sparse categories,
 unequal cell yields, or violated exchangeability (for example, batch

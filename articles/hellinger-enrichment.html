@@ -62,7 +62,7 @@ McElfresh</h4>
                         <h4 data-toc-skip class="author">Methods: Paul
 Edlefsen</h4>
             
-            <h4 data-toc-skip class="date">2026-07-29</h4>
+            <h4 data-toc-skip class="date">2026-09-28</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/GWMcElfresh/HellingerDistanceEnrichment/blob/HEAD/vignettes/hellinger-enrichment.Rmd" class="external-link"><code>vignettes/hellinger-enrichment.Rmd</code></a></small>
       <div class="d-none name"><code>hellinger-enrichment.Rmd</code></div>
@@ -93,9 +93,9 @@ statistically different.</p>
 subject compositions, the between/within distance ratio
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
 observed-inclusive label permutation, and collapse/subset
-contrasts—follows methods developed by Paul Edlefsen. The nested
-Dirichlet Bayes option implements the composition-uncertainty step he
-outlined beyond fixed-composition permutation.</p>
+contrasts—follows methods developed by Paul Edlefsen. The Dirichlet
+Bayes option instead draws subject compositions from a conjugate
+posterior so composition uncertainty is not treated as fixed.</p>
 <div class="section level3">
 <h3 id="what-is-composition-enrichment">What is composition enrichment?<a class="anchor" aria-label="anchor" href="#what-is-composition-enrichment"></a>
 </h3>
@@ -127,11 +127,11 @@ dominate the apparent pattern.</p>
 <p>This package tests enrichment by comparing the average pairwise
 Hellinger distance between subjects in different groups to the average
 pairwise distance between subjects in the same group. The output is an
-effect-size ratio and a p-value: from label permutation on fixed
-compositions, or, under the Bayesian option, from a permutation null
-averaged across posterior composition draws. Either way, the package
-breaks the result down into an omnibus summary and contrast-specific
-results.</p>
+effect-size ratio plus a p-value from label permutation on fixed
+compositions, or, under the Bayesian option, the posterior probability
+that the ratio exceeds 1 (<code>PPGT1</code>) from Dirichlet composition
+draws. Either way, the package breaks the result down into an omnibus
+summary and contrast-specific results.</p>
 </div>
 <div class="section level3">
 <h3 id="why-hellinger-distance">Why Hellinger distance?<a class="anchor" aria-label="anchor" href="#why-hellinger-distance"></a>
@@ -251,16 +251,21 @@ between/within distance summaries—either all groups (omnibus), a pair of
 groups (subset), or a remapped grouping (collapse). Custom contrasts are
 passed as a <strong>named list</strong> to <code>contrasts=</code>;
 names become <code>contrastId</code> values in the result.</p>
-<p>Two levels of p-value reporting matter in practice:</p>
+<p>Two levels of reporting matter in practice:</p>
 <ul>
 <li>
-<strong><code>result$omnibus$pValue</code></strong>: unadjusted
-p-value for the global between/within ratio across all groups.</li>
+<strong>Permutation:</strong> <code>result$omnibus$pValue</code> is
+the unadjusted p-value for the global between/within ratio;
+<code>result$contrasts$pValue</code> and <code>pAdj</code> are
+contrast-specific, with <code>pAdj</code> applying Holm adjustment
+across the contrast table by default
+(<code>pAdjustMethod = "holm"</code>).</li>
 <li>
-<strong><code>result$contrasts$pValue</code> and
-<code>pAdj</code></strong>: contrast-specific p-values, with
-<code>pAdj</code> applying Holm adjustment across the contrast table by
-default (<code>pAdjustMethod = "holm"</code>).</li>
+<strong>Bayes:</strong> <code>result$omnibus$PPGT1</code> and
+<code>result$contrasts$PPGT1</code> are the posterior probability that
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>.
+There is no <code>pAdj</code>; <code>pAdjustMethod</code> is
+unused.</li>
 </ul>
 <p>Omnibus and pairwise contrasts answer nested questions. A significant
 omnibus result indicates that at least some group separation exists
@@ -271,8 +276,9 @@ omnibus line.</p>
 <div class="section level3">
 <h3 id="permutation-vs-bayes-related-but-non-equivalent-questions">Permutation vs Bayes: related but non-equivalent questions<a class="anchor" aria-label="anchor" href="#permutation-vs-bayes-related-but-non-equivalent-questions"></a>
 </h3>
-<p>Both methods use label shuffling to define a null, but they differ in
-whether composition vectors are treated as fixed.</p>
+<p>Both methods use the same between/within ratio
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
+but they differ in whether composition vectors are treated as fixed.</p>
 <p><strong>Permutation (<code>method = "permutation"</code>).</strong>
 Compositions are estimated once from softened counts, fixing the subject
 distance matrix. Group labels are permuted among subjects
@@ -298,29 +304,30 @@ p_s \sim \mathrm{Dirichlet}(c_{s\cdot} + \alpha),
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>c</mi><mrow><mi>s</mi><mo>⋅</mo></mrow></msub><annotation encoding="application/x-tex">c_{s\cdot}</annotation></semantics></math>
 is the count vector for subject
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>.
-A full Hellinger distance matrix is rebuilt from that draw, and a nested
-permutation null (same label shuffles, <code>nPermutations</code> per
-draw) yields
+A full Hellinger distance matrix is rebuilt from that draw and
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
-and a draw-specific p-value. Across <code>nPosterior</code> draws, the
-package reports:</p>
+is recomputed. Across <code>nPosterior</code> draws, the package
+reports:</p>
 <ul>
 <li>posterior-mean
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
 (<code>effectSize</code>),</li>
-<li>posterior-mean p-value (<code>pValue</code>),</li>
+<li>posterior probability that
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>
+(<code>PPGT1</code>),</li>
 <li>95% credible interval on
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
 (<code>effectCiLow</code>, <code>effectCiHigh</code>).</li>
 </ul>
-<p>By sampling compositions before permuting labels, the Bayesian
-approach nests composition uncertainty inside the label-exchange null.
-When counts are sparse, that nesting can widen credible intervals or
-inflate mean p-values relative to plain permutation, even when point
-ratios look similar. When counts are dense and the imposed enrichment is
-strong, as in the synthetic example below, the two approaches often
-agree on which contrasts are elevated, though they still answer formally
-different questions.</p>
+<p>By sampling compositions rather than fixing them, the Bayesian
+approach propagates multinomial uncertainty into
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.
+When counts are sparse, that can widen credible intervals or lower
+<code>PPGT1</code> relative to a permutation p-value on the point
+estimate, even when point ratios look similar. When counts are dense and
+the imposed enrichment is strong, as in the synthetic example below, the
+two approaches often agree on which contrasts are elevated, though they
+still answer formally different questions.</p>
 </div>
 </div>
 <div class="section level2">
@@ -478,39 +485,33 @@ argument.</p>
 </h3>
 <p>The Bayesian method reuses the same contrast specifications but
 replaces fixed compositions with Dirichlet posterior draws. For vignette
-execution time, keep <code>nPosterior</code> and
-<code>nPermutations</code> small; production analyses should raise both
-so posterior means and intervals stabilize.</p>
+execution time, keep <code>nPosterior</code> small; production analyses
+should raise it so posterior means and intervals stabilize.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bayes_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions</a></span><span class="op">(</span></span>
 <span>  <span class="va">composition</span>,</span>
 <span>  method <span class="op">=</span> <span class="st">"bayes"</span>,</span>
 <span>  nPosterior <span class="op">=</span> <span class="fl">20</span>,</span>
-<span>  nPermutations <span class="op">=</span> <span class="fl">50</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">42</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">bayes_result</span><span class="op">$</span><span class="va">omnibus</span></span>
 <span><span class="co">#&gt; $effectSize</span></span>
-<span><span class="co">#&gt; [1] 1.701271</span></span>
+<span><span class="co">#&gt; [1] 1.713524</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $pValue</span></span>
-<span><span class="co">#&gt; [1] 0.01960784</span></span>
+<span><span class="co">#&gt; $PPGT1</span></span>
+<span><span class="co">#&gt; [1] 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $effectCiLow</span></span>
-<span><span class="co">#&gt; [1] 1.518504</span></span>
+<span><span class="co">#&gt; [1] 1.562867</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $effectCiHigh</span></span>
-<span><span class="co">#&gt; [1] 1.927508</span></span>
+<span><span class="co">#&gt; [1] 1.904499</span></span>
 <span><span class="va">bayes_result</span><span class="op">$</span><span class="va">contrasts</span></span>
-<span><span class="co">#&gt;                 contrastId effectSize     pValue effectCiLow effectCiHigh</span></span>
-<span><span class="co">#&gt; 2 Condition1_vs_Condition2  2.1586237 0.02254902   1.8198996     2.439920</span></span>
-<span><span class="co">#&gt; 3    Condition1_vs_Control  2.0552451 0.02156863   1.5958373     2.550478</span></span>
-<span><span class="co">#&gt; 4    Condition2_vs_Control  0.9986326 0.49901961   0.9200667     1.093116</span></span>
-<span><span class="co">#&gt;         pAdj</span></span>
-<span><span class="co">#&gt; 2 0.06470588</span></span>
-<span><span class="co">#&gt; 3 0.06470588</span></span>
-<span><span class="co">#&gt; 4 0.49901961</span></span></code></pre></div>
+<span><span class="co">#&gt;                 contrastId effectSize PPGT1 effectCiLow effectCiHigh</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2  2.1210626   1.0   1.7696895     2.521843</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control  1.9727319   1.0   1.6681298     2.332215</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control  0.9799171   0.3   0.9089024     1.048363</span></span></code></pre></div>
 <p>Reading the Bayes output requires one adjustment:
 <code>bayes_result$omnibus$effectSize</code> is the posterior mean of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
@@ -519,11 +520,10 @@ interval <code>effectCiLow</code>–<code>effectCiHigh</code> communicates
 whether
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>
 remains stable under composition uncertainty. When the credible interval
-excludes 1, enrichment is supported even if the posterior-mean p-value
-is moderated by label shuffling within each draw. When the interval
-spans 1 but permutation p-values are small, sparse counts may be driving
-a fixed-composition signal that the Bayesian procedure correctly
-weakens.</p>
+excludes 1, enrichment is supported and <code>PPGT1</code> is typically
+near 1. When the interval spans 1 but permutation p-values are small,
+sparse counts may be driving a fixed-composition signal that the
+Bayesian procedure correctly weakens.</p>
 </div>
 <div class="section level3">
 <h3 id="plot-contrasts">Plot contrasts<a class="anchor" aria-label="anchor" href="#plot-contrasts"></a>
@@ -534,8 +534,8 @@ effect sizes. A dotted vertical line at
 marks the exchangeability reference under this metric. When
 <code>showOmnibus = TRUE</code> (default), the omnibus posterior-mean or
 observed ratio appears as a dashed reference with its p-value
-annotated—contrasts can then be read against both unity and the global
-summary.</p>
+(permutation) or <code>PPGT1</code> (Bayes) annotated—contrasts can then
+be read against both unity and the global summary.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts</a></span><span class="op">(</span><span class="va">perm_result</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
@@ -558,7 +558,8 @@ Bayesian half-eye posterior densities for pairwise contrasts.
 <p>The two panels display the same ratio scale, each with
 method-appropriate uncertainty. Permutation emphasizes discrete
 significance against the label null; Bayes overlays composition
-uncertainty on that same null via half-eye densities.</p>
+uncertainty via half-eye densities of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
 </div>
 <div class="section level3">
 <h3 id="closing-interpretation">Closing interpretation<a class="anchor" aria-label="anchor" href="#closing-interpretation"></a>
@@ -570,10 +571,9 @@ omnibus ratio and both <code>Condition1</code> contrasts sit well above
 shift is real rather than label noise.
 <code>Condition2_vs_Control</code> behaves as expected for a group that
 was never modified, and the two methods agree on it: permutation returns
-R = 1.00 with pAdj = 0.38, and the Bayesian interval spans 1 (0.92–1.09)
-with a posterior-mean p-value of 0.50. A significant omnibus result
-therefore does not imply that every pairwise group differs from
-Control.</p>
+R = 1.00 with pAdj = 0.38, and the Bayesian interval spans 1 (0.91–1.05)
+with PPGT1 = 0.30. A significant omnibus result therefore does not imply
+that every pairwise group differs from Control.</p>
 <p>This result does not generalize to all real cohorts. Sparse
 categories, unequal cell yields, or violated exchangeability (for
 example, batch confounded with group) can produce ratios that look
