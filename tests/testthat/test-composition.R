@@ -271,6 +271,27 @@ test_that("custom contrast subset runs", {
     expect_true("pair_only" %in% result$contrasts$contrastId)
 })
 
+test_that("packaged h5ad extracts to CategoryComposition", {
+    skip_if_not_installed("anndata")
+    h5ad_path <- system.file(
+        "extdata", "tiny_obs.h5ad",
+        package = "HellingerDistanceEnrichment"
+    )
+    skip_if_not(nzchar(h5ad_path) && file.exists(h5ad_path))
+    adata <- try(anndata::read_h5ad(h5ad_path), silent = TRUE)
+    skip_if(inherits(adata, "try-error"), "Python anndata/read_h5ad unavailable")
+
+    composition <- ExtractClusterComposition(
+        adata,
+        subjectCol = "subjectId",
+        categoryCol = "category",
+        groupCol = "group"
+    )
+    expect_s3_class(composition, "CategoryComposition")
+    expect_equal(length(composition$subjectIds), 4)
+    expect_setequal(as.character(composition$group), c("A", "B"))
+})
+
 test_that("subject with multiple groups errors", {
     long_table <- data.frame(
         subjectId = c("S1", "S1"),
