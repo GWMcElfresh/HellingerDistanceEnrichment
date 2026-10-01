@@ -21,6 +21,7 @@ Useful links:
 
 Authors:
 \itemize{
+  \item GW McElfresh \email{gw@example.com}
   \item Paul Edlefsen (Original Hellinger enrichment methods)
 }
 

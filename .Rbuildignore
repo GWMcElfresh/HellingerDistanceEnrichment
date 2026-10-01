@@ -16,3 +16,4 @@
 ^docs$
 ^pkgdown$
 ^data-raw$
+^\.Rproj\.user$

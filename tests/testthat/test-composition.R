@@ -41,6 +41,38 @@ test_that("Hellinger distance matches known toy vectors", {
     expect_equal(identical_freqs, 0)
 })
 
+test_that("permutation pValue cannot fall below 1 / (nPermutations + 1)", {
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 4,
+        n_categories = 3,
+        seed = 11
+    )
+    n_permutations <- 40
+    result <- CompareGroupCompositions(
+        long_table,
+        method = "permutation",
+        nPermutations = n_permutations,
+        seed = 12
+    )
+    expect_gte(result$omnibus$pValue, 1 / (n_permutations + 1))
+})
+
+test_that("multinomial_size sets per-subject depth", {
+    multinomial_size <- 25
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 2,
+        n_categories = 3,
+        seed = 3,
+        multinomial_size = multinomial_size
+    )
+    counts_per_subject <- tapply(long_table$n, long_table$subjectId, sum)
+    expect_true(all(counts_per_subject == multinomial_size))
+    expect_error(
+        HellingerDistanceEnrichment:::build_synthetic_long_table(multinomial_size = 0),
+        "multinomial_size"
+    )
+})
+
 test_that("permutation null does not systematically yield tiny p under exchangeability", {
     long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
         n_subjects_per_group = 4,
@@ -63,13 +95,13 @@ test_that("permutation null does not systematically yield tiny p under exchangea
     expect_gt(median(p_values), 0.05)
 })
 
-test_that("planted structure yields enrichment signal", {
+test_that("simulated enrichment yields a detectable signal", {
     long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
         n_subjects_per_group = 8,
         n_categories = 4,
         seed = 7
     )
-    structured <- HellingerDistanceEnrichment:::plant_group_structure(
+    structured <- HellingerDistanceEnrichment:::simulate_test_dataset(
         long_table,
         target_group = "Treatment",
         target_category = "Category0",
@@ -87,7 +119,7 @@ test_that("planted structure yields enrichment signal", {
     expect_gt(result$omnibus$effectSize, 1)
 })
 
-test_that("three-group design plants one arm without disturbing the other", {
+test_that("three-group design enriches one arm without disturbing the other", {
     groups <- c("Control", "Condition1", "Condition2")
     long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
         n_subjects_per_group = 8,
@@ -95,7 +127,7 @@ test_that("three-group design plants one arm without disturbing the other", {
         groups = groups,
         seed = 21
     )
-    structured <- HellingerDistanceEnrichment:::plant_group_structure(
+    structured <- HellingerDistanceEnrichment:::simulate_test_dataset(
         long_table,
         target_group = "Condition1",
         target_category = "Category0",
@@ -110,33 +142,33 @@ test_that("three-group design plants one arm without disturbing the other", {
     )
 
     contrasts <- result$contrasts
-    planted <- contrasts$contrastId == "Condition1_vs_Control"
+    enriched_arm <- contrasts$contrastId == "Condition1_vs_Control"
     null_arm <- contrasts$contrastId == "Condition2_vs_Control"
 
-    expect_lt(contrasts$pValue[planted], 0.15)
+    expect_lt(contrasts$pValue[enriched_arm], 0.15)
     expect_gt(contrasts$pValue[null_arm], 0.2)
     expect_lt(result$omnibus$pValue, 0.2)
 })
 
-test_that("plant_group_structure rejects unknown group or category", {
+test_that("simulate_test_dataset rejects unknown group or category", {
     long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(seed = 1)
 
     expect_error(
-        HellingerDistanceEnrichment:::plant_group_structure(
+        HellingerDistanceEnrichment:::simulate_test_dataset(
             long_table,
             target_group = "MissingGroup"
         ),
         "target_group"
     )
     expect_error(
-        HellingerDistanceEnrichment:::plant_group_structure(
+        HellingerDistanceEnrichment:::simulate_test_dataset(
             long_table,
             target_category = "MissingCategory"
         ),
         "target_category"
     )
     expect_error(
-        HellingerDistanceEnrichment:::plant_group_structure(long_table, boost = 0),
+        HellingerDistanceEnrichment:::simulate_test_dataset(long_table, boost = 0),
         "boost must be positive"
     )
 })
@@ -197,7 +229,7 @@ test_that("Holm adjustment is monotonic on contrasts", {
         n_categories = 4,
         seed = 3
     )
-    structured <- HellingerDistanceEnrichment:::plant_group_structure(long_table, boost = 6)
+    structured <- HellingerDistanceEnrichment:::simulate_test_dataset(long_table, boost = 6)
 
     result <- CompareGroupCompositions(
         structured,

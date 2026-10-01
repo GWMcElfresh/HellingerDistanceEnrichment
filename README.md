@@ -14,6 +14,7 @@ Vignettes are published here:
 https://gwmcelfresh.github.io/HellingerDistanceEnrichment/
 
 - [Hellinger enrichment for subject-level compositions](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/hellinger-enrichment.html)
+- [Monte Carlo error in permutation p-values and the posterior probability that R exceeds 1](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/sampling-variation.html)
 - [Extracting compositions from Seurat and anndata](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/articles/extract-metadata.html)
 
 ## Installation

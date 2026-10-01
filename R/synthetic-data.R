@@ -1,19 +1,23 @@
 #' Build a long counts table with exchangeable multinomial compositions per group.
 #'
 #' Each subject receives an independent symmetric multinomial draw over categories
-#' within its group. Before planting, all groups share the same generative process,
-#' so group labels are exchangeable under the null.
+#' within its group. Before a composition shift is applied, all groups share the
+#' same generative process, so group labels are exchangeable under the null.
 #'
 #' @param n_subjects_per_group Number of subjects per group level (>= 1).
 #' @param n_categories Number of category levels (Category0, Category1, ...).
 #' @param groups Character vector of distinct group labels (>= 2 levels).
 #' @param seed Random seed for reproducibility.
+#' @param multinomial_size Total cell (or event) count per subject. This is the
+#'   multinomial depth, not the number of subjects; it is held fixed when a
+#'   scan varies `n_subjects_per_group`.
 #' @return data.frame with columns subjectId, category, group, n.
 #' @keywords internal
 build_synthetic_long_table <- function(n_subjects_per_group = 5,
                                        n_categories = 4,
                                        groups = c("Control", "Treatment"),
-                                       seed = 1) {
+                                       seed = 1,
+                                       multinomial_size = 100) {
     if (n_subjects_per_group < 1) {
         stop("n_subjects_per_group must be at least 1")
     }
@@ -26,12 +30,15 @@ build_synthetic_long_table <- function(n_subjects_per_group = 5,
     if (anyDuplicated(groups)) {
         stop("groups must be unique")
     }
+    if (multinomial_size < 1) {
+        stop("multinomial_size must be at least 1")
+    }
 
     set.seed(seed)
     rows <- list()
-    # Total count per subject sets the multinomial precision; symmetric probs keep
-    # groups exchangeable until planting targets one arm.
-    multinomial_size <- 100
+    # Symmetric category probabilities keep groups exchangeable until a
+    # composition shift targets one arm; multinomial_size is the per-subject
+    # depth of that draw.
 
     for (group_label in groups) {
         for (subject_idx in seq_len(n_subjects_per_group)) {
@@ -56,20 +63,20 @@ build_synthetic_long_table <- function(n_subjects_per_group = 5,
     do.call(rbind, rows)
 }
 
-#' Plant a composition shift in one group-category cell.
+#' Simulate a test dataset with a composition shift in one group-category cell.
 #'
 #' Multiplies counts at (target_group, target_category) by boost. Other group
-#' levels are unchanged, so a multi-group design can plant enrichment in one arm
-#' (for example Condition1) while leaving another arm exchangeable with Control
-#' (for example Condition2).
+#' levels are unchanged, so a multi-group design can introduce enrichment in one
+#' arm (for example Condition1) while leaving another arm exchangeable with
+#' Control (for example Condition2).
 #'
 #' @param long_table Output from build_synthetic_long_table.
 #' @param target_group Group label that receives elevated counts.
 #' @param target_category Category label to enrich.
 #' @param boost Positive multiplier applied only to matching rows.
-#' @return Modified long table with the planted shift.
+#' @return Modified long table with the imposed composition shift.
 #' @keywords internal
-plant_group_structure <- function(long_table,
+simulate_test_dataset <- function(long_table,
                                   target_group = "Treatment",
                                   target_category = "Category0",
                                   boost = 5) {

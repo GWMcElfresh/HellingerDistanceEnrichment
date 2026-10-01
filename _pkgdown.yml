@@ -19,5 +19,7 @@ navbar:
       menu:
         - text: Hellinger enrichment for subject-level compositions
           href: articles/hellinger-enrichment.html
+        - text: Monte Carlo error in permutation p-values and the posterior probability that R exceeds 1
+          href: articles/sampling-variation.html
         - text: Extracting compositions from Seurat and anndata
           href: articles/extract-metadata.html

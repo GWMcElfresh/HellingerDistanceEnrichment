@@ -56,8 +56,8 @@ The between/within Hellinger ratio, Jeffreys softening, observed-inclusive
 label-permutation p-value, and collapse/subset contrasts follow Paul
 Edlefsen's original procedure. \code{method = "bayes"} instead draws subject
 compositions from a conjugate Dirichlet posterior, rebuilds the Hellinger
-ratio \eqn{R} on each draw, and reports the posterior probability that
-\eqn{R > 1} (\code{PPGT1}).
+ratio \(R\) on each draw, and reports the posterior probability that
+\(R > 1\) (\code{PPGT1}).
 }
 \references{
 Edlefsen, P. Hellinger between/within enrichment for subject-level

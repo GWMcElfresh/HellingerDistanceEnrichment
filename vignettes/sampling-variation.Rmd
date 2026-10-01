@@ -1,0 +1,343 @@
+---
+title: "Monte Carlo error in permutation p-values and the posterior probability that R exceeds 1"
+author:
+  - GW McElfresh
+  - "Methods: Paul Edlefsen"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    md_extensions: +tex_math_single_backslash
+    pandoc_args: ["--mathjax"]
+vignette: >
+  %\VignetteIndexEntry{Monte Carlo error in permutation p-values and the posterior probability that R exceeds 1}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+A reported permutation p-value or posterior probability that the between/within Hellinger ratio \(R\) exceeds 1 is a Monte Carlo estimate. Changing `nPermutations` or `nPosterior` can move that number without moving any subject composition. The trap is to read that movement as a change in the biology. The companion vignette on Hellinger enrichment defines \(R\), the observed-inclusive permutation p-value \(p = (\#\{R_{\mathrm{perm}}\ge R_{\mathrm{obs}}\}+1)/(B+1)\), and the posterior probability that \(R > 1\), stored in the result as `PPGT1`. Here the compositions stay fixed. The question is when the Monte Carlo sample is large enough to trust the reported inference.
+
+Two kinds of Monte Carlo error are easy to confuse. First, a permutation p-value cannot be smaller than \(1/(B+1)\), because the observed statistic is counted in the numerator. If that floor sits at or above 0.05, you cannot report \(p < 0.05\). Second, the reported p-value and the reported posterior probability that \(R > 1\) are binomial proportions, so each has a Wilson interval that shrinks only as more permutations or posterior draws are taken. Independent runs at different \(B\) will not be monotone in the point estimate. The interval, not the point, is what should settle.
+
+`SummarizeSamplingError()` diagnoses a result you already have. It does not launch more draws. `decisionStable` is TRUE when the cutoff (0.05 for permutation p, 0.95 for the posterior probability that \(R > 1\)) lies outside the Wilson interval. `samplingSufficient` is TRUE when the Wilson half-width is at most 0.02. Those flags are not interchangeable. At \(B = 10\), p can sit on the floor \(1/11\) while the interval still contains 0.05.
+
+```{r helper-demo}
+library(HellingerDistanceEnrichment)
+library(ggplot2)
+
+unmodified <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+  n_subjects_per_group = 6,
+  n_categories = 4,
+  groups = c("Control", "Treatment"),
+  seed = 26,
+  multinomial_size = 100
+)
+weak_enrichment <- HellingerDistanceEnrichment:::simulate_test_dataset(
+  unmodified,
+  target_group = "Treatment",
+  target_category = "Category0",
+  boost = 1.5
+)
+moderate_enrichment <- HellingerDistanceEnrichment:::simulate_test_dataset(
+  unmodified,
+  target_group = "Treatment",
+  target_category = "Category0",
+  boost = 4
+)
+strong_enrichment <- HellingerDistanceEnrichment:::simulate_test_dataset(
+  unmodified,
+  target_group = "Treatment",
+  target_category = "Category0",
+  boost = 8
+)
+
+perm_small <- CompareGroupCompositions(
+  strong_enrichment,
+  method = "permutation",
+  nPermutations = 10,
+  seed = 2057
+)
+SummarizeSamplingError(perm_small)
+```
+
+The cohort size is held fixed: six subjects per group, two groups, four categories, and 100 cells per subject. What varies is the size of an imposed count shift. Starting from one unmodified table, Treatment `Category0` counts are multiplied by 1.5, 4, or 8. Those three tables are labeled weak, moderate, and strong enrichment; the names refer only to the multiplier, not to a biological claim. The unmodified table is left as generated, so its group labels remain exchangeable. We then scan `nPermutations` and `nPosterior` at 10, 100, 500, 1000, 2000, and 5000, with an independent seed at each point. Subject sample size is not varied. Changing the number of subjects would change the estimand those Monte Carlo samples are trying to resolve, which is a separate question.
+
+The Monte Carlo question is the same for each table. The true p-value and the true posterior probability that \(R > 1\) are not. A strong shift often sits on the permutation floor, so increasing \(B\) mostly lowers the smallest reportable p. A weak shift can leave the floor: extra permutations then estimate a small nonzero p rather than tracking \(1/(B+1)\) downward.
+
+```{r scan-helpers, echo = FALSE}
+n_grid <- c(10L, 100L, 500L, 1000L, 2000L, 5000L)
+cohort_labels <- c(
+  "Unmodified counts",
+  "Weak enrichment",
+  "Moderate enrichment",
+  "Strong enrichment"
+)
+cohort_tables <- list(
+  "Unmodified counts" = unmodified,
+  "Weak enrichment" = weak_enrichment,
+  "Moderate enrichment" = moderate_enrichment,
+  "Strong enrichment" = strong_enrichment
+)
+cohort_offsets <- c(
+  "Unmodified counts" = 0L,
+  "Weak enrichment" = 17L,
+  "Moderate enrichment" = 31L,
+  "Strong enrichment" = 47L
+)
+
+perm_seed <- function(n_permutations, cohort) {
+  2000L + as.integer(n_permutations) + unname(cohort_offsets[[cohort]])
+}
+bayes_seed <- function(n_posterior, cohort) {
+  3000L + as.integer(n_posterior) + unname(cohort_offsets[[cohort]])
+}
+
+scan_permutation <- function(long_table, n_permutations, seed, cohort) {
+  result <- CompareGroupCompositions(
+    long_table,
+    method = "permutation",
+    nPermutations = n_permutations,
+    seed = seed
+  )
+  summary_row <- SummarizeSamplingError(result)
+  summary_row$cohort <- cohort
+  summary_row$nPermutations <- n_permutations
+  summary_row$effectSize <- result$omnibus$effectSize
+  summary_row
+}
+
+scan_bayes <- function(long_table, n_posterior, seed, cohort) {
+  result <- CompareGroupCompositions(
+    long_table,
+    method = "bayes",
+    nPosterior = n_posterior,
+    seed = seed
+  )
+  summary_row <- SummarizeSamplingError(result)
+  summary_row$cohort <- cohort
+  summary_row$nPosterior <- n_posterior
+  summary_row$effectSize <- result$omnibus$effectSize
+  summary_row$effectCiLow <- result$omnibus$effectCiLow
+  summary_row$effectCiHigh <- result$omnibus$effectCiHigh
+  summary_row$ciWidth <- result$omnibus$effectCiHigh - result$omnibus$effectCiLow
+  summary_row
+}
+
+perm_grid <- expand.grid(
+  n_permutations = n_grid,
+  cohort = cohort_labels,
+  stringsAsFactors = FALSE
+)
+perm_scan <- do.call(rbind, lapply(seq_len(nrow(perm_grid)), function(row_idx) {
+  spec <- perm_grid[row_idx, ]
+  scan_permutation(
+    long_table = cohort_tables[[spec$cohort]],
+    n_permutations = spec$n_permutations,
+    seed = perm_seed(spec$n_permutations, spec$cohort),
+    cohort = spec$cohort
+  )
+}))
+perm_scan$cohort <- factor(perm_scan$cohort, levels = cohort_labels)
+
+replicate_seeds <- 2100L + seq_len(8L)
+perm_replicates <- do.call(rbind, lapply(replicate_seeds, function(replicate_seed) {
+  scan_permutation(
+    long_table = weak_enrichment,
+    n_permutations = 1000L,
+    seed = replicate_seed,
+    cohort = "Weak enrichment"
+  )
+}))
+perm_replicates$cohort <- factor(perm_replicates$cohort, levels = cohort_labels)
+
+bayes_grid <- expand.grid(
+  n_posterior = n_grid,
+  cohort = cohort_labels,
+  stringsAsFactors = FALSE
+)
+bayes_scan <- do.call(rbind, lapply(seq_len(nrow(bayes_grid)), function(row_idx) {
+  spec <- bayes_grid[row_idx, ]
+  scan_bayes(
+    long_table = cohort_tables[[spec$cohort]],
+    n_posterior = spec$n_posterior,
+    seed = bayes_seed(spec$n_posterior, spec$cohort),
+    cohort = spec$cohort
+  )
+}))
+bayes_scan$cohort <- factor(bayes_scan$cohort, levels = cohort_labels)
+```
+
+## Permutation resolution of p
+
+The goal of this section is to show the discrete grid of reportable permutation p-values, \(1/(B+1),\ldots,1\), and whether differences across \(B\) exceed binomial Monte Carlo error on a fixed table. Because the observed statistic is counted in the numerator, the smallest p a run can return is \(1/(B+1)\). The Wilson interval treats that reported p as a binomial proportion of \(B+1\) trials. Replicates at one \(B\) should scatter inside that interval if binomial variation is the right error model.
+
+```{r perm-plot, fig.cap="Omnibus permutation p-values on four fixed tables, with Wilson intervals. Open points are independent seeds at B = 1000 on the weak-enrichment table. The dashed line is the resolution floor 1 / (B + 1); the dotted line is 0.05."}
+ggplot(perm_scan, aes(x = nPermutations)) +
+  geom_hline(yintercept = 0.05, linetype = "dotted", color = "gray50") +
+  geom_line(aes(y = floor), linetype = "dashed", color = "gray40") +
+  geom_linerange(aes(ymin = intervalLow, ymax = intervalHigh)) +
+  geom_point(aes(y = estimate), size = 2.5, color = "#D55E00") +
+  geom_point(
+    data = perm_replicates,
+    aes(x = nPermutations, y = estimate),
+    color = "#D55E00",
+    alpha = 0.45,
+    shape = 1,
+    inherit.aes = FALSE
+  ) +
+  scale_x_log10(breaks = n_grid) +
+  facet_wrap(~ cohort, ncol = 2) +
+  labs(
+    x = "Number of permutations",
+    y = "Omnibus permutation p-value"
+  ) +
+  egg::theme_article()
+```
+
+```{r perm-flag-table}
+perm_flags <- perm_scan[
+  ,
+  c(
+    "cohort",
+    "nPermutations",
+    "effectSize",
+    "estimate",
+    "floor",
+    "onFloor",
+    "decisionStable",
+    "samplingSufficient"
+  )
+]
+perm_flags
+```
+
+```{r perm-summaries, echo = FALSE}
+perm_at <- function(cohort, n_permutations) {
+  perm_scan[
+    perm_scan$cohort == cohort & perm_scan$nPermutations == n_permutations,
+  ]
+}
+strong_b10 <- perm_at("Strong enrichment", 10L)
+strong_b1000 <- perm_at("Strong enrichment", 1000L)
+strong_b5000 <- perm_at("Strong enrichment", 5000L)
+moderate_b10 <- perm_at("Moderate enrichment", 10L)
+moderate_b1000 <- perm_at("Moderate enrichment", 1000L)
+weak_b10 <- perm_at("Weak enrichment", 10L)
+weak_b100 <- perm_at("Weak enrichment", 100L)
+weak_b1000 <- perm_at("Weak enrichment", 1000L)
+weak_b5000 <- perm_at("Weak enrichment", 5000L)
+unmod_b10 <- perm_at("Unmodified counts", 10L)
+unmod_b5000 <- perm_at("Unmodified counts", 5000L)
+unmod_overlap_10_5000 <- unmod_b10$intervalLow <= unmod_b5000$intervalHigh &&
+  unmod_b5000$intervalLow <= unmod_b10$intervalHigh
+replicates_inside_wilson <- mean(
+  perm_replicates$estimate >= weak_b1000$intervalLow &
+    perm_replicates$estimate <= weak_b1000$intervalHigh
+)
+```
+
+Take heed that a p-value sitting on the floor is a statement about resolution, not about an exact p of zero: no permutation was more extreme than the observed ratio, and \(B\) was not large enough to look further.
+
+On the strong table, \(B = 10\) reports p = `r format.pval(strong_b10$estimate, digits = 2, eps = 1e-4)` `r if (strong_b10$onFloor) "(the resolution floor 1/11)" else paste0("(floor 1/11 = ", signif(strong_b10$floor, 2), ")")`. `decisionStable` is `r strong_b10$decisionStable` and `samplingSufficient` is `r strong_b10$samplingSufficient`, because a floor above or near 0.05 cannot support a claim of \(p < 0.05\). Moderate enrichment at the same \(B\) is similar: p = `r format.pval(moderate_b10$estimate, digits = 2, eps = 1e-4)`, with \(R\) = `r sprintf("%.2f", moderate_b10$effectSize)` versus \(R\) = `r sprintf("%.2f", strong_b10$effectSize)` on the strong table. At the package default \(B = 1000\), strong enrichment has p = `r format.pval(strong_b1000$estimate, digits = 2, eps = 1e-4)` (`onFloor` = `r strong_b1000$onFloor`), and at \(B = 5000\) p = `r format.pval(strong_b5000$estimate, digits = 2, eps = 1e-4)`. Extra permutations mostly lower the floor.
+
+Weak enrichment is the useful contrast, because its ratio is smaller (\(R\) = `r sprintf("%.2f", weak_b1000$effectSize)` at \(B = 1000\)) and the true p need not be smaller than every permutation. At \(B = 10\), p = `r format.pval(weak_b10$estimate, digits = 2, eps = 1e-4)` and `onFloor` is `r weak_b10$onFloor`. At \(B = 100\), p = `r format.pval(weak_b100$estimate, digits = 2, eps = 1e-4)`, `decisionStable` is `r weak_b100$decisionStable`, and `samplingSufficient` is `r weak_b100$samplingSufficient`. At \(B = 1000\), p = `r format.pval(weak_b1000$estimate, digits = 2, eps = 1e-4)` with `onFloor` = `r weak_b1000$onFloor`, `decisionStable` = `r weak_b1000$decisionStable`, and `samplingSufficient` = `r weak_b1000$samplingSufficient`. At \(B = 5000\), p = `r format.pval(weak_b5000$estimate, digits = 2, eps = 1e-4)` and `onFloor` is `r weak_b5000$onFloor`. The estimate can leave the floor and settle rather than tracking \(1/(B+1)\) downward. Independent seeds at \(B = 1000\) on the weak table fall inside the Wilson interval from the plotted run `r sprintf("%.0f", 100 * replicates_inside_wilson)`% of the time, which is what the binomial error model predicts.
+
+On the unmodified table the same two ends of the ladder give p = `r format.pval(unmod_b10$estimate, digits = 2, eps = 1e-4)` and p = `r format.pval(unmod_b5000$estimate, digits = 2, eps = 1e-4)`. Those Wilson intervals `r if (unmod_overlap_10_5000) "overlap" else "do not overlap"`. More permutations did not invent a group difference. The point estimates moved because each run is an independent Monte Carlo sample; the intervals still describe the same exchangeable compositions.
+
+## Posterior probability that \(R\) exceeds 1
+
+The goal here is to separate two widths that are easy to confuse. The posterior probability that \(R > 1\) is the fraction of `nPosterior` Dirichlet draws in which the Hellinger ratio exceeds 1, so its Wilson interval must shrink as more draws are taken. The posterior credible interval on \(R\) reflects composition uncertainty given the counts. Increasing `nPosterior` need not shrink that second width once the Dirichlet posterior on \(R\) has been sampled well enough.
+
+```{r bayes-ppgt1-plot, fig.cap="Omnibus posterior probability that R > 1 on four fixed tables, with Wilson intervals on the Monte Carlo proportion of Dirichlet draws. The dotted line is the 0.95 decision cutoff."}
+ggplot(bayes_scan, aes(x = nPosterior)) +
+  geom_hline(yintercept = 0.95, linetype = "dotted", color = "gray50") +
+  geom_linerange(aes(ymin = intervalLow, ymax = intervalHigh)) +
+  geom_point(aes(y = estimate), size = 2.5, color = "#D55E00") +
+  scale_x_log10(breaks = n_grid) +
+  coord_cartesian(ylim = c(0, 1)) +
+  facet_wrap(~ cohort, ncol = 2) +
+  labs(
+    x = "Number of posterior draws",
+    y = "Posterior probability that R > 1"
+  ) +
+  egg::theme_article()
+```
+
+```{r bayes-flag-table}
+bayes_flags <- bayes_scan[
+  ,
+  c(
+    "cohort",
+    "nPosterior",
+    "effectSize",
+    "estimate",
+    "decisionStable",
+    "samplingSufficient"
+  )
+]
+bayes_flags
+```
+
+```{r bayes-ci-width, fig.cap="Width of the 95% posterior interval on the omnibus ratio R. This width is composition uncertainty, not Monte Carlo error in the posterior probability that R > 1."}
+ggplot(bayes_scan, aes(x = nPosterior, y = ciWidth, color = cohort)) +
+  geom_line() +
+  geom_point(size = 2) +
+  scale_x_log10(breaks = n_grid) +
+  scale_color_manual(
+    values = c(
+      "Unmodified counts" = "#0072B2",
+      "Weak enrichment" = "#009E73",
+      "Moderate enrichment" = "#E69F00",
+      "Strong enrichment" = "#D55E00"
+    )
+  ) +
+  labs(
+    x = "Number of posterior draws",
+    y = "Posterior CI width on R",
+    color = NULL
+  ) +
+  egg::theme_article()
+```
+
+```{r bayes-summaries, echo = FALSE}
+bayes_at <- function(cohort, n_posterior) {
+  bayes_scan[
+    bayes_scan$cohort == cohort & bayes_scan$nPosterior == n_posterior,
+  ]
+}
+strong_n10 <- bayes_at("Strong enrichment", 10L)
+strong_n100 <- bayes_at("Strong enrichment", 100L)
+strong_n5000 <- bayes_at("Strong enrichment", 5000L)
+weak_n10 <- bayes_at("Weak enrichment", 10L)
+weak_n100 <- bayes_at("Weak enrichment", 100L)
+weak_n5000 <- bayes_at("Weak enrichment", 5000L)
+unmod_n10 <- bayes_at("Unmodified counts", 10L)
+unmod_n5000 <- bayes_at("Unmodified counts", 5000L)
+```
+
+On the strong table, the posterior probability that \(R > 1\) is `r sprintf("%.2f", strong_n10$estimate)` at 10 draws (Wilson `r sprintf("%.2f", strong_n10$intervalLow)` to `r sprintf("%.2f", strong_n10$intervalHigh)`). `decisionStable` is `r strong_n10$decisionStable` and `samplingSufficient` is `r strong_n10$samplingSufficient`. Ten draws with every \(R > 1\) can report that probability as 1 while the interval still includes 0.95; that is the Bayesian analogue of sitting on the permutation floor. Weak enrichment at 10 draws gives `r sprintf("%.2f", weak_n10$estimate)` (Wilson `r sprintf("%.2f", weak_n10$intervalLow)` to `r sprintf("%.2f", weak_n10$intervalHigh)`), so a smaller ratio does not automatically make the Monte Carlo interval honest at a tiny draw count. At the package default of 100 draws, strong enrichment has posterior probability `r sprintf("%.2f", strong_n100$estimate)` (`decisionStable` = `r strong_n100$decisionStable`, `samplingSufficient` = `r strong_n100$samplingSufficient`) and weak enrichment has `r sprintf("%.2f", weak_n100$estimate)` (`decisionStable` = `r weak_n100$decisionStable`, `samplingSufficient` = `r weak_n100$samplingSufficient`). At 5000 draws the strong estimate is `r sprintf("%.2f", strong_n5000$estimate)` and the weak estimate is `r sprintf("%.2f", weak_n5000$estimate)`.
+
+When every draw has \(R > 1\), extra draws only tighten the binomial bound on a proportion that is already 1; they do not invent a new claim. The credible-interval width on \(R\) for the strong table goes from `r sprintf("%.2f", strong_n10$ciWidth)` at 10 draws to `r sprintf("%.2f", strong_n5000$ciWidth)` at 5000 draws. That second width is the Dirichlet uncertainty in the compositions, and it need not contract as `nPosterior` grows. Shrinking it further requires more cells per subject or more subjects, not more posterior draws of the same counts. The three enriched tables differ in posterior-mean \(R\); they do not differ in the fact that `nPosterior` is a Monte Carlo size, not a cohort size. You'll probably be tempted to read a narrower interval on the probability that \(R > 1\) as a narrower claim about \(R\) itself. Those are different scales.
+
+On the unmodified table, the posterior probability that \(R > 1\) is `r sprintf("%.2f", unmod_n10$estimate)` at 10 draws and `r sprintf("%.2f", unmod_n5000$estimate)` at 5000 draws. Extra Dirichlet samples tighten the Monte Carlo interval around a mid-range probability; they do not manufacture a posterior probability near 1.
+
+## What to do with your own result
+
+Call `SummarizeSamplingError()` on the `HellingerEnrichmentResult` you already computed. For permutation, raise \(B\) if the floor still sits at or above 0.05, or if the Wilson interval still contains 0.05. For Bayes, raise `nPosterior` if the Wilson interval on the posterior probability that \(R > 1\) still contains 0.95, or if the half-width is still above 0.02. A strong enrichment will often hit the permutation floor before the Wilson interval is narrow; a weak enrichment may leave the floor while still needing more draws for `samplingSufficient`. The package defaults (\(B = 1000\), `nPosterior` = 100) are often enough for a 0.05 / 0.95 reading, and they are not a substitute for checking the flags on the table in front of you.
+
+Do not treat a change in reported p as a change in the cohort when the Wilson intervals overlap. The definition of \(R\), the contrast table, and the distinction between label permutation and Dirichlet composition draws remain those of the Hellinger enrichment vignette. This article only measures how finely those procedures can be read on a fixed composition table.
+
+## Acknowledgments
+
+Paul Edlefsen developed the original Hellinger between/within enrichment
+procedure for subject-level categorical compositions. This vignette measures
+Monte Carlo resolution of that procedure; it does not change the definition
+of \(R\).

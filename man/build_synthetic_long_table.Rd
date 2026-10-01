@@ -8,7 +8,8 @@ build_synthetic_long_table(
   n_subjects_per_group = 5,
   n_categories = 4,
   groups = c("Control", "Treatment"),
-  seed = 1
+  seed = 1,
+  multinomial_size = 100
 )
 }
 \arguments{
@@ -19,13 +20,17 @@ build_synthetic_long_table(
 \item{groups}{Character vector of distinct group labels (>= 2 levels).}
 
 \item{seed}{Random seed for reproducibility.}
+
+\item{multinomial_size}{Total cell (or event) count per subject. This is the
+multinomial depth, not the number of subjects; it is held fixed when a
+scan varies \code{n_subjects_per_group}.}
 }
 \value{
 data.frame with columns subjectId, category, group, n.
 }
 \description{
 Each subject receives an independent symmetric multinomial draw over categories
-within its group. Before planting, all groups share the same generative process,
-so group labels are exchangeable under the null.
+within its group. Before a composition shift is applied, all groups share the
+same generative process, so group labels are exchangeable under the null.
 }
 \keyword{internal}
