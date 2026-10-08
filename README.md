@@ -90,9 +90,9 @@ an observed-inclusive p-value, and collapse/subset contrasts. This package
 implements that procedure.
 
 - **Permutation:** shuffle group labels on a fixed (softened) distance matrix; p-value includes the observed ratio (workbook style).
-- **Bayes:** draw subject compositions from a conjugate Dirichlet posterior; report the posterior probability that \(R > 1\) (abbreviated `PPGT1`) and effect-size credible intervals.
+- **Bayes:** draw subject compositions from a conjugate Dirichlet posterior; report the posterior probability that \(R > 1\) (abbreviated `PPGT1`) and a 95% highest posterior density interval on \(R\) (`credibleInterval = "cpi"` restores equal-tailed quantiles). Omnibus posterior draws are in `result$omnibus$draws`.
 
-Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Permutation contrast p-values are Holm-adjusted by default; the omnibus statistic is unadjusted. Bayes reports `PPGT1`.
+Effect size is the mean between-group pairwise Hellinger distance divided by the mean within-group pairwise distance. Omit `contrasts` to test every pairwise comparison; pass `contrasts` (a length-2 vector or a list of specs) to test only that planned family. Permutation contrast p-values are Holm-adjusted across the contrast rows that ran; the omnibus statistic is unadjusted. Bayes reports `PPGT1`.
 
 ## Acknowledgments
 

@@ -29,8 +29,11 @@ between/within Hellinger ratio axis, and returns a ggplot. Bayes results
 are drawn from the retained posterior effect-size draws
 (\code{nPosterior} rows per contrast) via \code{ggdist::stat_halfeye}, because a
 density slab needs samples rather than summarized \code{effectCiLow}/\code{effectCiHigh}
-intervals. Permutation results have no draws, so they render as points
-colored by adjusted significance. When \code{showOmnibus} is TRUE, the omnibus
-ratio is overlaid as a dashed reference with its p-value (permutation) or
-PPGT1 (Bayes) labeled beside the line.
+intervals. Half-eye nested intervals follow \code{result$settings$credibleInterval}
+(HPDI via \code{ggdist::mean_hdi}, CPI via \code{ggdist::mean_qi}) unless \code{...}
+overrides \code{point_interval}. Permutation results have no draws, so they
+render as points colored by adjusted significance. When \code{showOmnibus} is
+TRUE, the omnibus ratio is overlaid as a dashed reference with its p-value
+(permutation) or PPGT1 (Bayes) labeled beside the line. Omnibus draws stay
+in \code{result$omnibus$draws} rather than as a plot row.
 }

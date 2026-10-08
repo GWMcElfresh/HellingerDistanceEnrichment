@@ -24,6 +24,8 @@ parse_args <- function(args) {
             "  --n-posterior N       Posterior draws for bayes (default: 100)\n",
             "  --n-cores N           Parallel workers (default: 1)\n",
             "  --seed N              Random seed\n",
+            "  --credible-interval T Bayes interval: hpdi (default) or cpi\n",
+            "  --include-pairwise    TRUE or FALSE (default: unset, all pairwises)\n",
             "  --output-dir PATH     Output directory (default: ./hellinger_output)\n",
             "  --plot                Write contrast PDF via ggplot2\n"
         ))
@@ -41,6 +43,8 @@ parse_args <- function(args) {
         n_posterior = 100,
         n_cores = 1,
         seed = NA,
+        credible_interval = "hpdi",
+        include_pairwise = NA,
         output_dir = "./hellinger_output",
         plot = FALSE
     )
@@ -80,6 +84,12 @@ parse_args <- function(args) {
         }
         if (key == "--seed") {
             defaults$seed <- as.integer(args[i + 1]); i <- i + 2; next
+        }
+        if (key == "--credible-interval") {
+            defaults$credible_interval <- args[i + 1]; i <- i + 2; next
+        }
+        if (key == "--include-pairwise") {
+            defaults$include_pairwise <- args[i + 1]; i <- i + 2; next
         }
         if (key == "--output-dir") {
             defaults$output_dir <- args[i + 1]; i <- i + 2; next
@@ -149,13 +159,25 @@ main <- function() {
         opts$count_col
     )
 
+    include_pairwise <- if (is.na(opts$include_pairwise)) {
+        NULL
+    } else {
+        parsed <- toupper(as.character(opts$include_pairwise))
+        if (!parsed %in% c("TRUE", "FALSE")) {
+            stop("--include-pairwise must be TRUE or FALSE")
+        }
+        identical(parsed, "TRUE")
+    }
+
     result <- CompareGroupCompositions(
         composition,
         method = opts$method,
         nPermutations = opts$n_perm,
         nPosterior = opts$n_posterior,
         nCores = opts$n_cores,
-        seed = if (is.na(opts$seed)) NULL else opts$seed
+        seed = if (is.na(opts$seed)) NULL else opts$seed,
+        credibleInterval = opts$credible_interval,
+        includePairwise = include_pairwise
     )
 
     saveRDS(result, file.path(opts$output_dir, "hellinger_result.rds"))

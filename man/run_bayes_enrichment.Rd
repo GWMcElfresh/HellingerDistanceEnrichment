@@ -9,13 +9,14 @@ run_bayes_enrichment(
   contrast_specs,
   n_posterior,
   n_cores,
-  prior_pseudocounts
+  prior_pseudocounts,
+  credible_interval = "hpdi"
 )
 }
 \description{
 For each contrast, returns both a one-row posterior summary and the long
 draw table used by half-eye plots. Draw storage scales as
-\code{n_posterior * n_contrasts} effect sizes (omnibus excluded from the returned
-\code{draws}, matching \code{contrasts}).
+\code{n_posterior * n_contrasts} effect sizes, including omnibus, so the
+posterior of the global ratio can be inspected alongside pairwise draws.
 }
 \keyword{internal}

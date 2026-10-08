@@ -5,10 +5,13 @@
 #' are drawn from the retained posterior effect-size draws
 #' (`nPosterior` rows per contrast) via `ggdist::stat_halfeye`, because a
 #' density slab needs samples rather than summarized `effectCiLow`/`effectCiHigh`
-#' intervals. Permutation results have no draws, so they render as points
-#' colored by adjusted significance. When `showOmnibus` is TRUE, the omnibus
-#' ratio is overlaid as a dashed reference with its p-value (permutation) or
-#' PPGT1 (Bayes) labeled beside the line.
+#' intervals. Half-eye nested intervals follow `result$settings$credibleInterval`
+#' (HPDI via `ggdist::mean_hdi`, CPI via `ggdist::mean_qi`) unless `...`
+#' overrides `point_interval`. Permutation results have no draws, so they
+#' render as points colored by adjusted significance. When `showOmnibus` is
+#' TRUE, the omnibus ratio is overlaid as a dashed reference with its p-value
+#' (permutation) or PPGT1 (Bayes) labeled beside the line. Omnibus draws stay
+#' in `result$omnibus$draws` rather than as a plot row.
 #'
 #' @param result A HellingerEnrichmentResult from CompareGroupCompositions.
 #' @param theme ggplot2 theme (default egg::theme_article()).
@@ -27,7 +30,7 @@ PlotCompositionContrasts <- function(result,
 
     plot_data <- result$contrasts
     if (nrow(plot_data) == 0) {
-        stop("result has no contrasts to plot")
+        stop("result has no contrasts to plot; omnibus-only results are in result$omnibus")
     }
 
     contrast_levels <- rev(plot_data$contrastId)
@@ -40,14 +43,25 @@ PlotCompositionContrasts <- function(result,
             stop("Bayes result has no posterior draws to plot; re-run CompareGroupCompositions")
         }
 
-        draws_data <- result$draws
+        # Omnibus draws are retained for extraction but are not a contrast row.
+        draws_data <- result$draws[result$draws$contrastId %in% plot_data$contrastId, , drop = FALSE]
         draws_data$contrastId <- factor(draws_data$contrastId, levels = contrast_levels)
+
+        halfeye_args <- list(...)
+        if (is.null(halfeye_args$point_interval)) {
+            interval_type <- result$settings$credibleInterval
+            halfeye_args$point_interval <- if (identical(interval_type, "cpi")) {
+                ggdist::mean_qi
+            } else {
+                ggdist::mean_hdi
+            }
+        }
 
         p <- ggplot2::ggplot(
             draws_data,
             ggplot2::aes(x = .data$effectSize, y = .data$contrastId)
         ) +
-            ggdist::stat_halfeye(...)
+            do.call(ggdist::stat_halfeye, halfeye_args)
     } else {
         plot_data$significant <- plot_data$pAdj < 0.05
         p <- ggplot2::ggplot(

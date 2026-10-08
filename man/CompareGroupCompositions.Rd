@@ -14,6 +14,8 @@ CompareGroupCompositions(
   seed = NULL,
   priorPseudocounts = 1/2,
   pAdjustMethod = "holm",
+  credibleInterval = c("hpdi", "cpi"),
+  includePairwise = NULL,
   ...
 )
 }
@@ -22,10 +24,11 @@ CompareGroupCompositions(
 
 \item{method}{Inference method: \code{"permutation"} or \code{"bayes"}.}
 
-\item{contrasts}{Optional named list of custom contrast specifications. Each
-element may be a length-2 character vector of group levels (pairwise subset)
-or a list with \code{collapse} (named remap of group levels) and/or \code{groups}
-(subset to these levels before testing).}
+\item{contrasts}{Planned comparisons, or \code{NULL} for every pairwise contrast.
+A length-2 character vector is one pairwise comparison. A list may mix
+length-2 character vectors and lists with \code{collapse} (named remap of group
+levels) and/or \code{groups} (subset to these levels before testing). Names
+become \code{contrastId} values; unnamed elements get \code{A_vs_B} identifiers.}
 
 \item{nPermutations}{Number of label permutations (permutation method only).}
 
@@ -39,25 +42,39 @@ or a list with \code{collapse} (named remap of group levels) and/or \code{groups
 
 \item{pAdjustMethod}{Multiple-testing adjustment for permutation contrasts (\code{"holm"}, \code{"BH"}, \code{"none"}). Ignored for Bayes.}
 
+\item{credibleInterval}{Bayes interval type: \code{"hpdi"} (default, shortest 95\%
+interval on the draws) or \code{"cpi"} (equal-tailed 2.5\%/97.5\% quantiles).
+Ignored for permutation.}
+
+\item{includePairwise}{Include every pairwise comparison in addition to
+\code{contrasts}. Default \code{NULL} includes pairwises when \code{contrasts} is omitted
+(the usual all-pairs analysis) and skips them when \code{contrasts} is supplied
+so Holm is paid only on the planned family. \code{FALSE} skips auto pairwises
+even when \code{contrasts} is omitted (omnibus only). \code{TRUE} keeps all pairwises
+even when \code{contrasts} is supplied (the old additive overlay).}
+
 \item{...}{Ignored.}
 }
 \value{
-A HellingerEnrichmentResult with omnibus summary, pairwise
-\code{contrasts}, and (Bayes only) long-format posterior \code{draws} for plotting.
+A HellingerEnrichmentResult with omnibus summary, contrast table, and
+(Bayes only) long-format posterior \code{draws} including the omnibus draws.
 }
 \description{
 Tests whether between-group Hellinger distances exceed within-group distances
 using a permutation null or conjugate Dirichlet posterior-predictive Bayes.
-Computes an omnibus statistic plus all pairwise group contrasts and optional
-custom contrasts (subsets or collapses).
+Always reports an omnibus statistic. When \code{contrasts} is omitted, also tests
+every pairwise group comparison; when \code{contrasts} is supplied, those
+specifications are the contrast family (auto pairwises are omitted unless
+\code{includePairwise = TRUE}).
 }
 \details{
 The between/within Hellinger ratio, Jeffreys softening, observed-inclusive
 label-permutation p-value, and collapse/subset contrasts follow Paul
 Edlefsen's original procedure. \code{method = "bayes"} instead draws subject
 compositions from a conjugate Dirichlet posterior, rebuilds the Hellinger
-ratio \eqn{R} on each draw, and reports the posterior probability that
-\eqn{R > 1} (\code{PPGT1}).
+ratio \(R\) on each draw, and reports the posterior probability that
+\(R > 1\) (\code{PPGT1}) with a 95\% highest posterior density interval on \(R\)
+by default.
 }
 \references{
 Edlefsen, P. Hellinger between/within enrichment for subject-level

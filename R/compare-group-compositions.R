@@ -2,31 +2,44 @@
 #'
 #' Tests whether between-group Hellinger distances exceed within-group distances
 #' using a permutation null or conjugate Dirichlet posterior-predictive Bayes.
-#' Computes an omnibus statistic plus all pairwise group contrasts and optional
-#' custom contrasts (subsets or collapses).
+#' Always reports an omnibus statistic. When `contrasts` is omitted, also tests
+#' every pairwise group comparison; when `contrasts` is supplied, those
+#' specifications are the contrast family (auto pairwises are omitted unless
+#' `includePairwise = TRUE`).
 #'
 #' The between/within Hellinger ratio, Jeffreys softening, observed-inclusive
 #' label-permutation p-value, and collapse/subset contrasts follow Paul
 #' Edlefsen's original procedure. `method = "bayes"` instead draws subject
 #' compositions from a conjugate Dirichlet posterior, rebuilds the Hellinger
 #' ratio \(R\) on each draw, and reports the posterior probability that
-#' \(R > 1\) (`PPGT1`).
+#' \(R > 1\) (`PPGT1`) with a 95% highest posterior density interval on \(R\)
+#' by default.
 #'
 #' @param x A CategoryComposition object or long counts table.
 #' @param method Inference method: `"permutation"` or `"bayes"`.
-#' @param contrasts Optional named list of custom contrast specifications. Each
-#'   element may be a length-2 character vector of group levels (pairwise subset)
-#'   or a list with `collapse` (named remap of group levels) and/or `groups`
-#'   (subset to these levels before testing).
+#' @param contrasts Planned comparisons, or `NULL` for every pairwise contrast.
+#'   A length-2 character vector is one pairwise comparison. A list may mix
+#'   length-2 character vectors and lists with `collapse` (named remap of group
+#'   levels) and/or `groups` (subset to these levels before testing). Names
+#'   become `contrastId` values; unnamed elements get `A_vs_B` identifiers.
 #' @param nPermutations Number of label permutations (permutation method only).
 #' @param nPosterior Number of posterior draws (bayes method).
 #' @param nCores Number of parallel workers (default 1).
 #' @param seed Random seed for reproducibility.
 #' @param priorPseudocounts Jeffreys prior increment per category (default 1/2).
 #' @param pAdjustMethod Multiple-testing adjustment for permutation contrasts (`"holm"`, `"BH"`, `"none"`). Ignored for Bayes.
+#' @param credibleInterval Bayes interval type: `"hpdi"` (default, shortest 95%
+#'   interval on the draws) or `"cpi"` (equal-tailed 2.5%/97.5% quantiles).
+#'   Ignored for permutation.
+#' @param includePairwise Include every pairwise comparison in addition to
+#'   `contrasts`. Default `NULL` includes pairwises when `contrasts` is omitted
+#'   (the usual all-pairs analysis) and skips them when `contrasts` is supplied
+#'   so Holm is paid only on the planned family. `FALSE` skips auto pairwises
+#'   even when `contrasts` is omitted (omnibus only). `TRUE` keeps all pairwises
+#'   even when `contrasts` is supplied (the old additive overlay).
 #' @param ... Ignored.
-#' @return A HellingerEnrichmentResult with omnibus summary, pairwise
-#'   `contrasts`, and (Bayes only) long-format posterior `draws` for plotting.
+#' @return A HellingerEnrichmentResult with omnibus summary, contrast table, and
+#'   (Bayes only) long-format posterior `draws` including the omnibus draws.
 #' @references
 #' Edlefsen, P. Hellinger between/within enrichment for subject-level
 #' categorical compositions (Jeffreys softening, ratio statistic, label
@@ -41,8 +54,11 @@ CompareGroupCompositions <- function(x,
                                      seed = NULL,
                                      priorPseudocounts = 1/2,
                                      pAdjustMethod = "holm",
+                                     credibleInterval = c("hpdi", "cpi"),
+                                     includePairwise = NULL,
                                      ...) {
     method <- match.arg(method)
+    credibleInterval <- match.arg(credibleInterval)
 
     if (method == "bayes") {
         unused <- character()
@@ -61,6 +77,8 @@ CompareGroupCompositions <- function(x,
                 call. = FALSE
             )
         }
+    } else if (!identical(credibleInterval, "hpdi")) {
+        warning("credibleInterval unused for method = \"permutation\"; ignored", call. = FALSE)
     }
 
     composition <- if (inherits(x, "CategoryComposition")) {
@@ -77,9 +95,18 @@ CompareGroupCompositions <- function(x,
         set.seed(seed)
     }
 
+    include_pairwise <- resolve_include_pairwise(includePairwise, !is.null(contrasts))
+    if (!include_pairwise && is.null(contrasts)) {
+        warning(
+            "includePairwise is FALSE and no contrasts were supplied; only the omnibus test will run",
+            call. = FALSE
+        )
+    }
+
     contrast_specs <- build_contrast_specifications(
         group = composition$group,
-        custom_contrasts = contrasts
+        custom_contrasts = contrasts,
+        include_pairwise = include_pairwise
     )
 
     if (method == "permutation") {
@@ -96,7 +123,8 @@ CompareGroupCompositions <- function(x,
             contrast_specs = contrast_specs,
             n_posterior = nPosterior,
             n_cores = nCores,
-            prior_pseudocounts = priorPseudocounts
+            prior_pseudocounts = priorPseudocounts,
+            credible_interval = credibleInterval
         )
     }
 
@@ -121,7 +149,9 @@ CompareGroupCompositions <- function(x,
                 nCores = nCores,
                 seed = seed,
                 priorPseudocounts = priorPseudocounts,
-                pAdjustMethod = pAdjustMethod
+                pAdjustMethod = pAdjustMethod,
+                credibleInterval = credibleInterval,
+                includePairwise = include_pairwise
             ),
             diagnostics = result_body$diagnostics
         ),
@@ -167,9 +197,102 @@ print.HellingerEnrichmentResult <- function(x, ...) {
     invisible(x)
 }
 
-#' Build contrast specifications from group levels and custom overrides.
+#' 95% posterior interval on finite draws: shortest HPDI or equal-tailed CPI.
+#'
+#' HPDI uses the Chen-Shao shortest window covering `ceil(prob * n)` sorted
+#' samples. Quantile intervals spend equal tail mass, which is a poor summary
+#' when the posterior of \(R\) is asymmetric and sits just above 1; the
+#' shortest covering window is the HPD for a continuous unimodal sample.
 #' @keywords internal
-build_contrast_specifications <- function(group, custom_contrasts = NULL) {
+compute_posterior_interval <- function(x, prob = 0.95, type = c("hpdi", "cpi")) {
+    type <- match.arg(type)
+    x <- x[is.finite(x)]
+    n <- length(x)
+    if (n < 2) {
+        return(c(NA_real_, NA_real_))
+    }
+
+    if (type == "cpi") {
+        tail_mass <- (1 - prob) / 2
+        return(stats::quantile(
+            x,
+            probs = c(tail_mass, 1 - tail_mass),
+            na.rm = TRUE,
+            names = FALSE
+        ))
+    }
+
+    x_sorted <- sort(x)
+    n_cover <- min(n, ceiling(prob * n))
+    n_windows <- n - n_cover + 1
+    widths <- x_sorted[seq.int(n_cover, n)] - x_sorted[seq_len(n_windows)]
+    best <- which.min(widths)[1]
+    c(x_sorted[best], x_sorted[best + n_cover - 1])
+}
+
+#' Resolve whether auto pairwises run given planned contrasts.
+#'
+#' NULL follows the planned-comparison rule: all pairwises when `contrasts` is
+#' omitted, none when a family is supplied. FALSE is omnibus-only if no family
+#' is supplied; TRUE restores the old additive overlay.
+#' @keywords internal
+resolve_include_pairwise <- function(include_pairwise, has_custom_contrasts) {
+    if (is.null(include_pairwise)) {
+        return(!has_custom_contrasts)
+    }
+    if (!is.logical(include_pairwise) || length(include_pairwise) != 1 || is.na(include_pairwise)) {
+        stop("includePairwise must be TRUE, FALSE, or NULL")
+    }
+    include_pairwise
+}
+
+#' Coerce a length-2 vector or (un)named list into a named contrast list.
+#' @keywords internal
+coerce_contrast_list <- function(contrasts) {
+    if (is.null(contrasts)) {
+        return(NULL)
+    }
+
+    if (is.character(contrasts) && length(contrasts) == 2) {
+        contrast_id <- paste(contrasts, collapse = "_vs_")
+        out <- list(contrasts)
+        names(out) <- contrast_id
+        return(out)
+    }
+
+    if (!is.list(contrasts)) {
+        stop("contrasts must be a length-2 character vector or a list of contrast specifications")
+    }
+    if (length(contrasts) == 0) {
+        stop("contrasts must contain at least one specification")
+    }
+
+    contrast_names <- names(contrasts)
+    if (is.null(contrast_names)) {
+        contrast_names <- rep("", length(contrasts))
+    }
+
+    auto_ids <- vapply(seq_along(contrasts), function(idx) {
+        if (nzchar(contrast_names[[idx]])) {
+            return(contrast_names[[idx]])
+        }
+        spec <- contrasts[[idx]]
+        if (is.character(spec) && length(spec) == 2) {
+            return(paste(spec, collapse = "_vs_"))
+        }
+        if (is.list(spec) && !is.null(spec$groups) && length(spec$groups) > 0) {
+            return(paste(spec$groups, collapse = "_vs_"))
+        }
+        paste0("contrast_", idx)
+    }, character(1))
+
+    names(contrasts) <- make.unique(auto_ids, sep = "_")
+    contrasts
+}
+
+#' Build contrast specifications from group levels and planned comparisons.
+#' @keywords internal
+build_contrast_specifications <- function(group, custom_contrasts = NULL, include_pairwise = TRUE) {
     group_levels <- levels(group)
     specs <- list()
 
@@ -179,22 +302,26 @@ build_contrast_specifications <- function(group, custom_contrasts = NULL) {
         collapse = NULL
     )
 
-    pair_indices <- utils::combn(group_levels, 2, simplify = FALSE)
-    for (pair in pair_indices) {
-        contrast_id <- paste(pair, collapse = "_vs_")
-        specs[[contrast_id]] <- list(
-            contrastId = contrast_id,
-            groups = pair,
-            collapse = NULL
-        )
+    if (isTRUE(include_pairwise)) {
+        pair_indices <- utils::combn(group_levels, 2, simplify = FALSE)
+        for (pair in pair_indices) {
+            contrast_id <- paste(pair, collapse = "_vs_")
+            specs[[contrast_id]] <- list(
+                contrastId = contrast_id,
+                groups = pair,
+                collapse = NULL
+            )
+        }
     }
 
+    custom_contrasts <- coerce_contrast_list(custom_contrasts)
     if (!is.null(custom_contrasts)) {
-        if (!is.list(custom_contrasts) || is.null(names(custom_contrasts))) {
-            stop("contrasts must be a named list")
-        }
         for (contrast_name in names(custom_contrasts)) {
-            spec <- normalize_contrast_spec(custom_contrasts[[contrast_name]], contrast_name, group_levels)
+            spec <- normalize_contrast_spec(
+                custom_contrasts[[contrast_name]],
+                contrast_name,
+                group_levels
+            )
             specs[[contrast_name]] <- spec
         }
     }
@@ -205,6 +332,14 @@ build_contrast_specifications <- function(group, custom_contrasts = NULL) {
 #' @keywords internal
 normalize_contrast_spec <- function(spec, contrast_id, all_group_levels) {
     if (is.character(spec) && length(spec) == 2) {
+        unknown_groups <- setdiff(spec, all_group_levels)
+        if (length(unknown_groups) > 0) {
+            stop(sprintf(
+                "contrast '%s' refers to unknown group(s): %s",
+                contrast_id,
+                paste(unknown_groups, collapse = ", ")
+            ))
+        }
         return(list(
             contrastId = contrast_id,
             groups = spec,
@@ -221,6 +356,28 @@ normalize_contrast_spec <- function(spec, contrast_id, all_group_levels) {
 
     if (is.null(groups) && is.null(collapse)) {
         stop(sprintf("contrast '%s' must specify groups and/or collapse", contrast_id))
+    }
+
+    if (!is.null(collapse)) {
+        unknown_from <- setdiff(names(collapse), all_group_levels)
+        if (length(unknown_from) > 0) {
+            stop(sprintf(
+                "contrast '%s' collapse refers to unknown group(s): %s",
+                contrast_id,
+                paste(unknown_from, collapse = ", ")
+            ))
+        }
+    }
+
+    if (!is.null(groups) && is.null(collapse)) {
+        unknown_groups <- setdiff(groups, all_group_levels)
+        if (length(unknown_groups) > 0) {
+            stop(sprintf(
+                "contrast '%s' refers to unknown group(s): %s",
+                contrast_id,
+                paste(unknown_groups, collapse = ", ")
+            ))
+        }
     }
 
     list(
@@ -380,44 +537,45 @@ run_bayes_draw <- function(counts, group, spec, prior_pseudocounts) {
 #'
 #' For each contrast, returns both a one-row posterior summary and the long
 #' draw table used by half-eye plots. Draw storage scales as
-#' `n_posterior * n_contrasts` effect sizes (omnibus excluded from the returned
-#' `draws`, matching `contrasts`).
+#' `n_posterior * n_contrasts` effect sizes, including omnibus, so the
+#' posterior of the global ratio can be inspected alongside pairwise draws.
 #' @keywords internal
-run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_cores, prior_pseudocounts) {
+run_bayes_enrichment <- function(composition,
+                                 contrast_specs,
+                                 n_posterior,
+                                 n_cores,
+                                 prior_pseudocounts,
+                                 credible_interval = "hpdi") {
     counts <- composition$counts
     group <- composition$group
     contrast_names <- names(contrast_specs)
 
     run_contrast_bayes <- function(contrast_name) {
         spec <- contrast_specs[[contrast_name]]
-        draw_results <- vector("list", n_posterior)
-
         draw_indices <- seq_len(n_posterior)
         compute_draw <- function(draw_idx) {
             run_bayes_draw(counts, group, spec, prior_pseudocounts)
         }
 
-        if (n_cores > 1) {
-            draw_results <- parallel::mclapply(draw_indices, compute_draw, mc.cores = min(n_cores, n_posterior))
+        draw_results <- if (n_cores > 1) {
+            parallel::mclapply(draw_indices, compute_draw, mc.cores = min(n_cores, n_posterior))
         } else {
-            draw_results <- lapply(draw_indices, compute_draw)
+            lapply(draw_indices, compute_draw)
         }
 
         effect_sizes <- vapply(draw_results, function(x) x$effectSize, numeric(1))
-
-        ci_quantiles <- stats::quantile(
+        ci_bounds <- compute_posterior_interval(
             effect_sizes,
-            probs = c(0.025, 0.975),
-            na.rm = TRUE,
-            names = FALSE
+            prob = 0.95,
+            type = credible_interval
         )
 
         summary_row <- data.frame(
             contrastId = spec$contrastId,
             effectSize = mean(effect_sizes),
             PPGT1 = mean(effect_sizes > 1),
-            effectCiLow = ci_quantiles[1],
-            effectCiHigh = ci_quantiles[2],
+            effectCiLow = ci_bounds[1],
+            effectCiHigh = ci_bounds[2],
             stringsAsFactors = FALSE
         )
 
@@ -447,17 +605,18 @@ run_bayes_enrichment <- function(composition, contrast_specs, n_posterior, n_cor
 
     omnibus_row <- contrasts_df[contrasts_df$contrastId == "omnibus", , drop = FALSE]
     contrast_only <- contrasts_df[contrasts_df$contrastId != "omnibus", , drop = FALSE]
-    draws_only <- draws_df[draws_df$contrastId != "omnibus", , drop = FALSE]
+    omnibus_draws <- draws_df$effectSize[draws_df$contrastId == "omnibus"]
 
     list(
         omnibus = list(
             effectSize = omnibus_row$effectSize[1],
             PPGT1 = omnibus_row$PPGT1[1],
             effectCiLow = omnibus_row$effectCiLow[1],
-            effectCiHigh = omnibus_row$effectCiHigh[1]
+            effectCiHigh = omnibus_row$effectCiHigh[1],
+            draws = omnibus_draws
         ),
         contrasts = contrast_only,
-        draws = draws_only,
+        draws = draws_df,
         diagnostics = list(nPosterior = n_posterior)
     )
 }

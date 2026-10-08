@@ -2,11 +2,15 @@
 % Please edit documentation in R/compare-group-compositions.R
 \name{build_contrast_specifications}
 \alias{build_contrast_specifications}
-\title{Build contrast specifications from group levels and custom overrides.}
+\title{Build contrast specifications from group levels and planned comparisons.}
 \usage{
-build_contrast_specifications(group, custom_contrasts = NULL)
+build_contrast_specifications(
+  group,
+  custom_contrasts = NULL,
+  include_pairwise = TRUE
+)
 }
 \description{
-Build contrast specifications from group levels and custom overrides.
+Build contrast specifications from group levels and planned comparisons.
 }
 \keyword{internal}

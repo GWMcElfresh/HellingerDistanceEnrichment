@@ -168,7 +168,49 @@ test_that("Bayes smoke test returns finite PPGT1", {
     expect_true(!is.null(result$draws))
     expect_gt(nrow(result$draws), 0)
     expect_true(all(c("contrastId", "draw", "effectSize") %in% colnames(result$draws)))
-    expect_false("omnibus" %in% result$draws$contrastId)
+    expect_true("omnibus" %in% result$draws$contrastId)
+    expect_equal(result$settings$credibleInterval, "hpdi")
+    expect_equal(length(result$omnibus$draws), 5)
+    expect_equal(
+        result$omnibus$draws,
+        result$draws$effectSize[result$draws$contrastId == "omnibus"]
+    )
+})
+
+test_that("compute_posterior_interval distinguishes HPDI from CPI on an asymmetric sample", {
+    x <- c(rep(0, 90), 10:19)
+    cpi <- HellingerDistanceEnrichment:::compute_posterior_interval(x, prob = 0.95, type = "cpi")
+    hpdi <- HellingerDistanceEnrichment:::compute_posterior_interval(x, prob = 0.95, type = "hpdi")
+
+    expect_equal(
+        cpi,
+        as.numeric(stats::quantile(x, probs = c(0.025, 0.975), names = FALSE))
+    )
+    expect_false(isTRUE(all.equal(hpdi, cpi)))
+    expect_lt(diff(hpdi), diff(cpi))
+})
+
+test_that("Bayes CPI option is recorded and returns finite intervals", {
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 4,
+        n_categories = 3,
+        seed = 13
+    )
+
+    result <- CompareGroupCompositions(
+        long_table,
+        method = "bayes",
+        nPosterior = 8,
+        nCores = 1,
+        seed = 2,
+        credibleInterval = "cpi"
+    )
+
+    expect_equal(result$settings$credibleInterval, "cpi")
+    expect_true(all(is.finite(result$contrasts$effectCiLow)))
+    expect_true(all(is.finite(result$contrasts$effectCiHigh)))
+    expect_true(is.finite(result$omnibus$effectCiLow))
+    expect_true(is.finite(result$omnibus$effectCiHigh))
 })
 
 test_that("Bayes warns when unused permutation arguments are non-default", {
@@ -269,6 +311,118 @@ test_that("custom contrast subset runs", {
         seed = 6
     )
     expect_true("pair_only" %in% result$contrasts$contrastId)
+    expect_equal(result$contrasts$contrastId, "pair_only")
+    expect_true(!is.null(result$omnibus$effectSize))
+})
+
+test_that("a length-2 contrasts vector is a planned pairwise family", {
+    groups <- c("Control", "Condition1", "Condition2")
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 4,
+        n_categories = 3,
+        groups = groups,
+        seed = 14
+    )
+
+    result <- CompareGroupCompositions(
+        long_table,
+        method = "permutation",
+        nPermutations = 20,
+        contrasts = c("Control", "Condition1"),
+        seed = 3
+    )
+
+    expect_equal(result$contrasts$contrastId, "Control_vs_Condition1")
+    expect_false("Condition1_vs_Condition2" %in% result$contrasts$contrastId)
+    expect_false("Condition2_vs_Control" %in% result$contrasts$contrastId)
+    expect_true(is.finite(result$omnibus$effectSize))
+})
+
+test_that("unnamed contrast list keeps only the supplied pairs", {
+    groups <- c("Control", "Condition1", "Condition2")
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 4,
+        n_categories = 3,
+        groups = groups,
+        seed = 15
+    )
+
+    result <- CompareGroupCompositions(
+        long_table,
+        method = "permutation",
+        nPermutations = 20,
+        contrasts = list(
+            c("Control", "Condition1"),
+            c("Control", "Condition2")
+        ),
+        seed = 4
+    )
+
+    expect_setequal(
+        result$contrasts$contrastId,
+        c("Control_vs_Condition1", "Control_vs_Condition2")
+    )
+    expect_false("Condition1_vs_Condition2" %in% result$contrasts$contrastId)
+})
+
+test_that("unknown contrast group names stop", {
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(seed = 16)
+
+    expect_error(
+        CompareGroupCompositions(
+            long_table,
+            method = "permutation",
+            nPermutations = 10,
+            contrasts = c("Control", "MissingGroup"),
+            seed = 5
+        ),
+        "MissingGroup"
+    )
+})
+
+test_that("includePairwise TRUE restores additive pairwise overlay", {
+    groups <- c("Control", "Condition1", "Condition2")
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(
+        n_subjects_per_group = 4,
+        n_categories = 3,
+        groups = groups,
+        seed = 17
+    )
+
+    result <- CompareGroupCompositions(
+        long_table,
+        method = "permutation",
+        nPermutations = 20,
+        contrasts = list(primary = c("Control", "Condition1")),
+        includePairwise = TRUE,
+        seed = 6
+    )
+
+    expect_true("primary" %in% result$contrasts$contrastId)
+    expect_true("Condition1_vs_Condition2" %in% result$contrasts$contrastId)
+    expect_true("Condition2_vs_Control" %in% result$contrasts$contrastId)
+})
+
+test_that("includePairwise FALSE without contrasts is omnibus only", {
+    long_table <- HellingerDistanceEnrichment:::build_synthetic_long_table(seed = 18)
+
+    expect_warning(
+        result <- CompareGroupCompositions(
+            long_table,
+            method = "permutation",
+            nPermutations = 20,
+            includePairwise = FALSE,
+            seed = 7
+        ),
+        "only the omnibus test will run"
+    )
+
+    expect_equal(nrow(result$contrasts), 0)
+    expect_true(is.finite(result$omnibus$effectSize))
+    expect_error(
+        PlotCompositionContrasts(result),
+        "omnibus-only"
+    )
 })
 
 test_that("packaged h5ad extracts to CategoryComposition", {
