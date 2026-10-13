@@ -8,15 +8,22 @@ PlotCompositionContrasts(
   result,
   theme = egg::theme_article(),
   showOmnibus = TRUE,
+  showEnergyDistance = TRUE,
   ...
 )
 }
 \arguments{
 \item{result}{A HellingerEnrichmentResult from CompareGroupCompositions.}
 
-\item{theme}{ggplot2 theme (default egg::theme_article()).}
+\item{theme}{ggplot2 theme (default egg::theme_article()). With the
+default, the legend sits above the panels; a theme you supply keeps its
+own legend placement.}
 
-\item{showOmnibus}{If TRUE, annotate the omnibus effect size as a dashed line.}
+\item{showOmnibus}{If TRUE, mark the omnibus value in each panel with a
+dashed line.}
+
+\item{showEnergyDistance}{If TRUE (default), stack an energy distance
+panel below the ratio panel.}
 
 \item{...}{Passed to ggdist::stat_halfeye for Bayes plots.}
 }
@@ -24,13 +31,31 @@ PlotCompositionContrasts(
 A ggplot object.
 }
 \description{
-Takes a HellingerEnrichmentResult, maps each pairwise contrast onto the
-between/within Hellinger ratio axis, and returns a ggplot. Bayes results
-are drawn from the retained posterior effect-size draws
-(\code{nPosterior} rows per contrast) via \code{ggdist::stat_halfeye}, because a
-density slab needs samples rather than summarized \code{effectCiLow}/\code{effectCiHigh}
-intervals. Permutation results have no draws, so they render as points
-colored by adjusted significance. When \code{showOmnibus} is TRUE, the omnibus
-ratio is overlaid as a dashed reference with its p-value (permutation) or
-PPGT1 (Bayes) labeled beside the line.
+Takes a HellingerEnrichmentResult and returns a ggplot with one row per
+pairwise contrast. By default the plot stacks two panels that share those
+rows: the between/within Hellinger ratio \eqn{R} on top and the energy
+distance \eqn{E} below, each with its own x axis, so both read left to right. \eqn{R}
+carries the p-values, \code{PPGT1}, and \code{R_PPGTnope}; \eqn{E}
+shows the size of the shift in squared Hellinger units. A dotted line marks
+each statistic's no-difference value (\eqn{R = 1}, \eqn{E = 0}). Set
+\code{showEnergyDistance = FALSE} for the ratio alone.
+}
+\details{
+Bayes results draw from the retained posterior draws (\code{nPosterior} rows per
+contrast) via \code{ggdist::stat_halfeye}, because a density slab needs samples
+rather than summarized intervals. Half-eye nested intervals follow
+\code{result$settings$credibleInterval} (HPDI via \code{ggdist::mean_hdi}, CPI via
+\code{ggdist::mean_qi}) unless \code{...} overrides \code{point_interval}. When a Bayes
+result carries a NOPE, permutation-calibrated or fixed, a gray band behind each half-eye
+spans that statistic's interval: \eqn{R} from 1 to \code{R_nopeHigh} in the top panel, \eqn{E} from
+0 to \code{E_nopeHigh} in the bottom panel. You can then see how much of each
+posterior clears its edge. The legend names each band: "NOPE (permutation)"
+for the default permutation-calibrated bound, whose band shows the median of
+the per-draw bounds, or "NOPE (fixed)" for a bound you supplied. Permutation
+results have no draws, so they render as points colored by adjusted
+significance. When \code{showOmnibus} is TRUE, a dashed line in each panel marks
+the omnibus value; the \eqn{R} panel labels it with its p-value (permutation)
+or \code{PPGT1} and \code{R_PPGTnope} (Bayes), and the \eqn{E} panel labels it with \eqn{E}
+and, under Bayes, \code{E_PPGTnope}.
+Omnibus draws stay in \code{result$omnibus$draws} rather than as a plot row.
 }

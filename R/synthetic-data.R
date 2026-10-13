@@ -56,6 +56,104 @@ build_synthetic_long_table <- function(n_subjects_per_group = 5,
     do.call(rbind, rows)
 }
 
+#' Simulate a two-group cohort with controlled depth, heterogeneity, and shift.
+#'
+#' Each subject draws a latent composition from a Dirichlet centered on its
+#' group's mean composition, then draws `reads_per_subject` counts from a
+#' multinomial on that composition. Three knobs separate the sources of
+#' variation the sampling vignette studies: `reads_per_subject` sets count noise
+#' within a subject, `concentration` sets how far subjects scatter around their
+#' group mean (larger is more homogeneous), and `shift` moves composition mass
+#' between two categories in the second group only.
+#'
+#' The baseline mean composition decays linearly over categories (e.g. 10
+#' categories run from about 0.18 down to 0.02), so the shift moves `shift`
+#' mass from the first, most abundant category to the last, rarest one.
+#'
+#' @param n_subjects_per_group Subjects per group; length 1 or 2.
+#' @param n_categories Number of categories (>= 2).
+#' @param reads_per_subject Multinomial count total per subject.
+#' @param concentration Dirichlet concentration per group; length 1 or 2.
+#' @param shift Composition mass moved in the second group, in [0, first
+#'   category's baseline share).
+#' @param groups Two group labels.
+#' @param seed Random seed, or `NULL` to use the current stream.
+#' @return List with `long_table` (subjectId, category, group, n),
+#'   `latent_counts` (subjects by categories latent compositions scaled to
+#'   `reads_per_subject`, for noise-free reference statistics), and `group`
+#'   (named factor).
+#' @keywords internal
+simulate_composition_cohort <- function(n_subjects_per_group = 8,
+                                        n_categories = 10,
+                                        reads_per_subject = 2000,
+                                        concentration = 50,
+                                        shift = 0,
+                                        groups = c("Control", "Treatment"),
+                                        seed = NULL) {
+    if (length(groups) != 2 || anyDuplicated(groups)) {
+        stop("groups must be two distinct labels")
+    }
+    if (n_categories < 2) {
+        stop("n_categories must be at least 2")
+    }
+    n_subjects_per_group <- rep_len(n_subjects_per_group, 2)
+    concentration <- rep_len(concentration, 2)
+    if (any(n_subjects_per_group < 2) || any(concentration <= 0) || reads_per_subject < 1) {
+        stop("need at least 2 subjects per group, positive concentration, and at least 1 read")
+    }
+
+    baseline_weights <- rev(seq_len(n_categories))
+    baseline_mean <- baseline_weights / sum(baseline_weights)
+    if (shift < 0 || shift >= baseline_mean[1]) {
+        stop(sprintf("shift must be in [0, %.3f) for %d categories", baseline_mean[1], n_categories))
+    }
+    shifted_mean <- baseline_mean
+    shifted_mean[1] <- shifted_mean[1] - shift
+    shifted_mean[n_categories] <- shifted_mean[n_categories] + shift
+    group_means <- list(baseline_mean, shifted_mean)
+
+    if (!is.null(seed)) {
+        set.seed(seed)
+    }
+
+    category_labels <- paste0("Category", seq_len(n_categories) - 1)
+    subject_ids <- character()
+    subject_groups <- character()
+    latent_rows <- list()
+    count_rows <- list()
+
+    for (group_idx in 1:2) {
+        alpha <- concentration[group_idx] * group_means[[group_idx]]
+        for (subject_idx in seq_len(n_subjects_per_group[group_idx])) {
+            gamma_draws <- stats::rgamma(n_categories, shape = alpha, rate = 1)
+            latent_composition <- gamma_draws / sum(gamma_draws)
+            subject_counts <- as.vector(stats::rmultinom(1, reads_per_subject, latent_composition))
+
+            subject_ids <- c(subject_ids, sprintf("%s_S%02d", groups[group_idx], subject_idx))
+            subject_groups <- c(subject_groups, groups[group_idx])
+            latent_rows[[length(latent_rows) + 1]] <- latent_composition * reads_per_subject
+            count_rows[[length(count_rows) + 1]] <- subject_counts
+        }
+    }
+
+    latent_counts <- do.call(rbind, latent_rows)
+    count_matrix <- do.call(rbind, count_rows)
+    dimnames(latent_counts) <- list(subject_ids, category_labels)
+    dimnames(count_matrix) <- list(subject_ids, category_labels)
+
+    long_table <- data.frame(
+        subjectId = rep(subject_ids, times = n_categories),
+        category = rep(category_labels, each = length(subject_ids)),
+        group = rep(subject_groups, times = n_categories),
+        n = as.vector(count_matrix),
+        stringsAsFactors = FALSE
+    )
+    group <- factor(subject_groups, levels = groups)
+    names(group) <- subject_ids
+
+    list(long_table = long_table, latent_counts = latent_counts, group = group)
+}
+
 #' Plant a composition shift in one group-category cell.
 #'
 #' Multiplies counts at (target_group, target_category) by boost. Other group

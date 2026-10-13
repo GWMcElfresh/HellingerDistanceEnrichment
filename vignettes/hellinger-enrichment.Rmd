@@ -23,35 +23,31 @@ knitr::opts_chunk$set(
 )
 ```
 
-Understanding whether categorical compositions differ between experimental groups is critical when single-cell annotations are summarized to subject-level frequencies. However, the scale of inference is not the cell: it is the donor (or animal, or replicate) whose multinomial counts define a composition vector on a probability simplex. Cell-level cluster proportions can look sharply different while subject-level compositions remain exchangeable across groups, and the reverse can hold when sampling noise is large relative to an imposed enrichment. Real cohorts rarely reduce to a single pairwise comparison, so this vignette uses three groups: a Control, a Condition1 group with an imposed enrichment, and a Condition2 group that remains exchangeable with Control. Here, we illustrate `HellingerDistanceEnrichment` on that synthetic cohort, separating the conceptual framework (distance, ratio, contrasts, inference) from the worked analysis that recovers which comparisons are statistically different.
+Understanding whether categorical compositions differ between experimental groups is critical when you summarize single-cell annotations to subject-level frequencies. The unit of inference is the donor (or animal, or replicate), whose multinomial counts define a composition vector on a probability simplex. Cell-level cluster proportions can look sharply different while subject-level compositions remain exchangeable across groups, and the reverse can hold when sampling noise is large relative to an imposed enrichment. Real cohorts rarely reduce to a single pairwise comparison, so this vignette uses three groups: a Control, a Condition1 group with an imposed enrichment, and a Condition2 group that remains exchangeable with Control. Here, we illustrate `HellingerDistanceEnrichment` on that synthetic cohort, separating the conceptual framework (distance, ratio, contrasts, inference) from the worked analysis that recovers which comparisons differ.
 
 ## Concepts
 
-The inferential core below—Hellinger geometry on Jeffreys-softened subject
-compositions, the between/within distance ratio \(R\), observed-inclusive label
-permutation, and collapse/subset contrasts—follows methods developed by Paul
-Edlefsen. The Dirichlet Bayes option instead draws subject compositions from a
-conjugate posterior so composition uncertainty is not treated as fixed.
+Paul Edlefsen developed the inferential core below: Hellinger geometry on Jeffreys-softened subject compositions, the between/within distance ratio \(R\), observed-inclusive label permutation, and collapse/subset contrasts. The Dirichlet Bayes option instead draws subject compositions from a conjugate posterior, so composition uncertainty carries into every statistic the package reports.
 
-### What is composition enrichment?
+### Composition enrichment
 
-Composition enrichment asks whether experimental groups occupy different regions of the simplex once cells have been aggregated to subjects. At the cell scale, each row carries a category label (cluster, cell type, module score bin) and metadata that links that cell to a subject and a group. At the subject scale, those labels become counts: for subject \(s\) and category \(k\), we observe \(c_{sk}\) cells (or events) in category \(k\), and the subject's composition is the normalized frequency vector \(p_s = (c_{s1}, \ldots, c_{sK}) / \sum_k c_{sk}\).
+Composition enrichment asks whether experimental groups occupy different regions of the simplex once you aggregate cells to subjects. At the cell scale, each row carries a category label (cluster, cell type, module score bin) and metadata that links that cell to a subject and a group. At the subject scale, those labels become counts: for subject \(s\) and category \(k\), we observe \(c_{sk}\) cells (or events) in category \(k\), and the subject's composition is the normalized frequency vector \(p_s = (c_{s1}, \ldots, c_{sK}) / \sum_k c_{sk}\).
 
-The scientific question is relational rather than descriptive. We are not asking which category is most abundant in one subject; we are asking whether between-group compositional distance exceeds within-group compositional distance across subjects. That framing mirrors pseudobulking in expression analysis: many cells collapse to one replicate-level observation, and hypothesis tests must respect the replicate as the unit of inference. A cluster that is enriched at the cell level within a single subject does not, by itself, establish group-level enrichment, because one subject's multinomial draw can dominate the apparent pattern.
+The scientific question is relational. We ask whether between-group compositional distance exceeds within-group compositional distance across subjects, and leave aside which category dominates any one subject. That framing mirrors pseudobulking in expression analysis: many cells collapse to one replicate-level observation, and hypothesis tests must respect the replicate as the unit of inference. A cluster enriched at the cell level within a single subject does not, by itself, establish group-level enrichment, because one subject's multinomial draw can dominate the apparent pattern.
 
 This package tests enrichment by comparing the average pairwise Hellinger distance between subjects in different groups to the average pairwise distance between subjects in the same group. The output is an effect-size ratio plus a p-value from label permutation on fixed compositions, or, under the Bayesian option, the posterior probability that the ratio exceeds 1 (`PPGT1`) from Dirichlet composition draws. Either way, the package breaks the result down into an omnibus summary and contrast-specific results.
 
-### Why Hellinger distance?
+### Hellinger distance
 
-Once counts are normalized to frequencies, compositions live on a simplex, and Euclidean distance on raw proportions is a poor geometry: scaling one category compresses the others, and small zeros carry disproportionate weight. Hellinger distance measures separation between two frequency vectors \(p\) and \(q\) by comparing their square roots:
+Once you normalize counts to frequencies, compositions live on a simplex, and Euclidean distance on raw proportions is a poor geometry: scaling one category compresses the others, and small zeros carry disproportionate weight. Hellinger distance measures separation between two frequency vectors \(p\) and \(q\) by comparing their square roots:
 
 \[
 H(p,q)=\frac{1}{\sqrt{2}}\left\lVert\sqrt{p}-\sqrt{q}\right\rVert_2 \in [0,1].
 \]
 
-Values near 0 indicate similar compositions; values near 1 indicate near-disjoint support. The implementation computes \(H\) from count vectors by forming frequencies internally, so the distance is always taken on normalized compositions rather than raw counts.
+Values near 0 indicate similar compositions; values near 1 indicate near-disjoint support. The package computes \(H\) from count vectors by forming frequencies internally, so it measures distance on normalized compositions, never on raw counts.
 
-Sparse categories create a second problem: empirical frequencies of zero are not credible endpoints when counts are small. Before distances are evaluated, counts are softened with a Jeffreys-style pseudocount. For subject \(s\), category \(k\), and default \(\alpha = 1/2\),
+Sparse categories create a second problem: empirical frequencies of zero are not credible endpoints when counts are small. Before computing distances, the package softens counts with a Jeffreys-style pseudocount. For subject \(s\), category \(k\), and default \(\alpha = 1/2\),
 
 \[
 \tilde{c}_{sk} = c_{sk} + \alpha, \qquad
@@ -60,11 +56,11 @@ p_{sk} = \frac{\tilde{c}_{sk}}{\sum_j \tilde{c}_{sj}}.
 
 The default `priorPseudocounts = 1/2` matches the conjugate Dirichlet prior used in the Bayesian approach. Softening pulls extreme proportions toward the simplex center and stabilizes pairwise distances when some categories are rarely observed.
 
-Hellinger distance is appropriate for asking whether compositions are separable in frequency space. It does not, by itself, identify which category drives a contrast, establish causality, or correct for differences in total cell yield between subjects beyond what is encoded in the normalized frequencies. Biological interpretation still requires knowing what the categories represent and whether the aggregation level matches the experimental question.
+Hellinger distance answers whether compositions are separable in frequency space. It does not, by itself, identify which category drives a contrast, establish causality, or correct for differences in total cell yield between subjects beyond what the normalized frequencies encode. Biological interpretation still requires knowing what the categories represent and whether the aggregation level matches the experimental question.
 
-### What is the enrichment ratio?
+### The enrichment ratio
 
-Given a subjects-by-categories count matrix, the package builds a symmetric subject-level Hellinger distance matrix \(D\), where \(D_{ss'} = H(p_s, p_{s'})\) using softened, normalized compositions. Subjects are then grouped by experimental label \(g\). For each group pair \((g, g')\), the package summarizes distances as mean pairwise Hellinger distance within or between subject sets:
+Given a subjects-by-categories count matrix, the package builds a symmetric subject-level Hellinger distance matrix \(D\), where \(D_{ss'} = H(p_s, p_{s'})\) using softened, normalized compositions. It then groups subjects by experimental label \(g\) and, for each group pair \((g, g')\), summarizes distances as mean pairwise Hellinger distance within or between subject sets:
 
 - **Within-group** (diagonal of the group summary): mean of \(D_{ss'}\) for subjects \(s, s'\) both in group \(g\).
 - **Between-group** (off-diagonal): mean of \(D_{ss'}\) for subjects \(s\) in group \(g\), \(s'\) in group \(g'\).
@@ -75,28 +71,28 @@ The enrichment effect size is the ratio of average between-group distance to ave
 R=\frac{\overline{H}_{\mathrm{between}}}{\overline{H}_{\mathrm{within}}}.
 \]
 
-When \(R > 1\), subjects in different groups are farther apart, on average, than subjects within the same group under this metric. When \(R \approx 1\), group labels are consistent with exchangeable compositions relative to the observed within-group dispersion. The ratio is defined over pairwise subject distances, so each group must contribute at least two subjects; otherwise within-group means are not identifiable and inference stops with an error.
+When \(R > 1\), subjects in different groups are farther apart, on average, than subjects within the same group under this metric. When \(R \approx 1\), group labels are consistent with exchangeable compositions relative to the observed within-group dispersion. The ratio rests on pairwise subject distances, so each group must contribute at least two subjects; otherwise within-group means are not identifiable and inference stops with an error.
 
-This ratio is the test statistic for both permutation and Bayes methods. It compresses a full distance matrix into a single scale-free quantity that can be compared across contrasts and posterior draws.
+This ratio is the test statistic for both permutation and Bayes methods. It compresses a full distance matrix into a single scale-free quantity that you can compare across contrasts and posterior draws.
 
-### What is a contrast?
+### Contrasts
 
-A contrast is a specified comparison among group labels on which \(R\) is evaluated. The package always computes an **omnibus** contrast that includes all group levels present in the composition object. For \(G\) groups, it also computes all **pairwise** contrasts (\(\binom{G}{2}\) comparisons) unless additional custom specifications are supplied.
+A contrast is a specified comparison among group labels on which the package evaluates \(R\). The package always computes an **omnibus** contrast that includes all group levels present in the composition object. Without `contrasts`, it also computes all **pairwise** contrasts (\(\binom{G}{2}\) comparisons). If you pass `contrasts`, those specifications become the contrast family: the package skips auto pairwises, so you pay the permutation Holm adjustment only on the comparisons you named. Set `includePairwise = TRUE` if you still want the full pairwise set in addition to your specs.
 
-The analogy to differential expression is deliberate but not exact. In DE, a contrast selects linear combinations of model coefficients on log-expression. Here, a contrast selects which subjects enter the between/within distance summaries—either all groups (omnibus), a pair of groups (subset), or a remapped grouping (collapse). Custom contrasts are passed as a **named list** to `contrasts=`; names become `contrastId` values in the result.
+The analogy to differential expression is deliberate but not exact. In DE, a contrast selects linear combinations of model coefficients on log-expression. Here, a contrast selects which subjects enter the between/within distance summaries: all groups (omnibus), a pair of groups (subset), or a remapped grouping (collapse). A length-2 character vector is one pairwise comparison. A list may mix those vectors with collapse or subset lists; names become `contrastId` values, and unnamed elements get `A_vs_B` identifiers.
 
 Two levels of reporting matter in practice:
 
 - **Permutation:** `result$omnibus$pValue` is the unadjusted p-value for the global between/within ratio; `result$contrasts$pValue` and `pAdj` are contrast-specific, with `pAdj` applying Holm adjustment across the contrast table by default (`pAdjustMethod = "holm"`).
-- **Bayes:** `result$omnibus$PPGT1` and `result$contrasts$PPGT1` are the posterior probability that \(R > 1\). There is no `pAdj`; `pAdjustMethod` is unused.
+- **Bayes:** `result$omnibus$PPGT1` and `result$contrasts$PPGT1` are the posterior probability that \(R > 1\); `R_PPGTnope` and `E_PPGTnope` are the posterior probabilities that \(R\) and \(E\) clear their NOPE edges (`R_nopeHigh`, `E_nopeHigh`). There is no `pAdj`; `pAdjustMethod` is unused.
 
 Omnibus and pairwise contrasts answer nested questions. A significant omnibus result indicates that at least some group separation exists under the ratio metric; pairwise contrasts localize that separation, with multiplicity control on the contrast table rather than on the omnibus line.
 
-### Permutation vs Bayes: related but non-equivalent questions
+### Permutation and Bayes answer different questions
 
-Both methods use the same between/within ratio \(R\), but they differ in whether composition vectors are treated as fixed.
+Both methods use the same between/within ratio \(R\); they differ in whether they hold composition vectors fixed.
 
-**Permutation (`method = "permutation"`).** Compositions are estimated once from softened counts, fixing the subject distance matrix. Group labels are permuted among subjects \(B\) times (`nPermutations`), and \(R\) is recomputed on each shuffle. The one-sided p-value includes the observed statistic in the numerator:
+**Permutation (`method = "permutation"`).** The package estimates compositions once from softened counts, which fixes the subject distance matrix. It then permutes group labels among subjects \(B\) times (`nPermutations`) and recomputes \(R\) on each shuffle. The one-sided p-value includes the observed statistic in the numerator:
 
 \[
 p=\frac{\#\{R_{\mathrm{perm}}\ge R_{\mathrm{obs}}\}+1}{B+1}.
@@ -104,25 +100,63 @@ p=\frac{\#\{R_{\mathrm{perm}}\ge R_{\mathrm{obs}}\}+1}{B+1}.
 
 This tests whether group labels are exchangeable **given** the estimated compositions. It does not propagate uncertainty in the multinomial allocation of cells to categories.
 
-**Bayes (`method = "bayes"`).** For each posterior draw, subject compositions are sampled from a conjugate Dirichlet posterior. With Jeffreys increment \(\alpha\),
+**Bayes (`method = "bayes"`).** For each posterior draw, the package samples subject compositions from a conjugate Dirichlet posterior. With Jeffreys increment \(\alpha\),
 
 \[
 p_s \sim \mathrm{Dirichlet}(c_{s\cdot} + \alpha),
 \]
 
-where \(c_{s\cdot}\) is the count vector for subject \(s\). A full Hellinger distance matrix is rebuilt from that draw and \(R\) is recomputed. Across `nPosterior` draws, the package reports:
+where \(c_{s\cdot}\) is the count vector for subject \(s\). The package rebuilds the full Hellinger distance matrix from that draw and recomputes \(R\) and \(E\). Across `nPosterior` draws, it reports:
 
 - posterior-mean \(R\) (`effectSize`),
 - posterior probability that \(R > 1\) (`PPGT1`),
-- 95% credible interval on \(R\) (`effectCiLow`, `effectCiHigh`).
+- posterior probabilities that \(R\) and \(E\) clear their NOPE intervals, permutation-calibrated null reference intervals set by label shuffling (`R_PPGTnope`, `E_PPGTnope`), with the median upper bound of each interval (`R_nopeHigh`, `E_nopeHigh`), described below,
+- 95% highest posterior density interval on \(R\) (`effectCiLow`, `effectCiHigh`), the shortest window containing 95% of the draws.
 
-By sampling compositions rather than fixing them, the Bayesian approach propagates multinomial uncertainty into \(R\). When counts are sparse, that can widen credible intervals or lower `PPGT1` relative to a permutation p-value on the point estimate, even when point ratios look similar. When counts are dense and the imposed enrichment is strong, as in the synthetic example below, the two approaches often agree on which contrasts are elevated, though they still answer formally different questions.
+`PPGT1` is \(P(R > 1)\). \(R = 1\) is the exchangeability reference for the metric (between-group distances match within-group distances on average), not a threshold for a practically large enrichment. You read closeness to 1 from the interval and from the posterior draws, including `result$omnibus$draws` and the `omnibus` rows of `result$draws`. Equal-tailed central posterior intervals remain available via `credibleInterval = "cpi"`. HPDI is the better default when the posterior of \(R\) is asymmetric near 1, because a quantile interval spends equal mass in both tails even if one tail is a long, empty stretch.
+
+By sampling compositions instead of fixing them, the Bayesian approach propagates multinomial uncertainty into \(R\). When counts are sparse, that can widen credible intervals or lower `PPGT1` relative to a permutation p-value on the point estimate, even when point ratios look similar. When counts are dense, Dirichlet draws concentrate around the same frequencies used by permutation, so a ratio that sits only slightly above 1 can still have `PPGT1` near 1: composition-sampling noise is small relative to a 1-2% bump in \(R\), while label permutation still finds that bump easy to produce by chance. The two methods then disagree without either being misspecified, because they answer formally different questions. With dense counts and a strong imposed enrichment, as in the synthetic example below, they often agree on which contrasts rise above 1.
+
+### NOPE: a permutation-calibrated null reference for the Bayes output
+
+Dense counts are the usual case for single-cell data, where each subject contributes hundreds or thousands of cells, and that is where `PPGT1` misleads. The Dirichlet posterior only describes count noise within each subject, so it treats the sampled subjects as the whole population. If groups do not differ, the sample \(R\) still lands a little above or below 1, and as depth grows the posterior shrinks onto that chance value. In the sampling-depth vignette's simulation (10 categories, 8 versus 8 subjects drawn from identical populations, 100 cohorts per depth), 27% of cohorts reported `PPGT1 > 0.95` at 2000 reads per subject and 25% at 500, against 1% at 50 reads per subject. A threshold of exactly 1 therefore means something different at different depths.
+
+The defaults `nope = "shuffle"` and `energyNope = "shuffle"` set a Null-Oriented Permutation Equivalence (NOPE) interval on each statistic: a permutation-calibrated null reference interval for conditional effects. The interval is conditional in two senses: on the observed design (group sizes, depths, within-group spread) and on each posterior draw's compositions. The goal parallels a permutation test, but NOPE reports a region instead of a p-value. Within each posterior draw, the package shuffles group labels `nNopeShuffles` times (default 200) on that draw's distance matrix and takes the 95th percentile of the shuffled \(R\) and of the shuffled \(E\) as the upper edges of their NOPEs. Shuffling keeps the group sizes, depths, number of categories, and within-group spread, so each edge is the largest value these subjects routinely produce when labels carry no information; in that simulation the \(R\) edge sat near 1.06 at every depth, and `R_PPGTnope > 0.95` fired in at most 1% of the null cohorts.
+
+`R_PPGTnope` is the posterior probability that \(R\) clears its edge, and `E_PPGTnope` the same for \(E\); `R_nopeHigh` and `E_nopeHigh` are the median edges across draws. We floor each draw's edge at the no-difference value (1 for \(R\), 0 for \(E\)), so `R_PPGTnope` can never exceed `PPGT1`. We recommend reading the NOPE probabilities as the headline Bayes result and keeping `PPGT1` as the exchangeability reference. Take heed of the threshold, though: a cutoff of 0.95 asks nearly every draw to clear its own shuffle edge, so it runs well below a 5% false-positive rate and loses power, most of all at shallow depth (`R_PPGTnope > 0.95` detected 1% of 5-point shifts at 50 reads per subject, against 50% for the permutation test). In the same simulation `R_PPGTnope > 0.5` tracked the permutation test at 500 and 2000 reads, and the sampling-depth vignette reports the same comparison for `E_PPGTnope`. Setting `nope` or `energyNope` to `"none"` drops that statistic's columns. A fixed seed gives different posterior draws with and without a NOPE, because its shuffles consume random numbers between Dirichlet draws; fixed edges consume none.
+
+Very small groups cannot support a NOPE, for the same reason they cannot produce a small permutation p-value. With 3 versus 3 subjects there are only 10 distinct ways to split them, so the true split alone is 10% of all shuffles and neither statistic can clear its 95th percentile. If the true split is at least 5% of shuffles, the package warns, reports both NOPE probabilities as `NA` instead of a misleading 0, and sets `enoughShufflesForNope` to `FALSE` so the reason stays attached to the result; 4 versus 4 is the smallest balanced design that supports it.
+
+### NOPE and Kruschke's ROPE
+
+NOPE borrows the equivalence logic of Kruschke's region of practical equivalence, or ROPE ([Kruschke, 2018](https://www.psychologicalscience.org/journals/ampps/2515245918771304/), *Advances in Methods and Practices in Psychological Science* 1:270-280) and departs from his procedure in two ways. In Kruschke's ROPE, the analyst fixes the region before seeing the data, from domain knowledge of which effects are negligible, and the decision compares the 95% highest density interval with that region. That works when the parameter has familiar units, such as a difference in means. Few of us have that intuition for a ratio of mean Hellinger distances or for an energy distance, so the NOPE takes its edge from the data: the largest value of the statistic these subjects routinely produce when group labels carry no information. The edge also differs from draw to draw, and each NOPE probability counts the draws that clear their own edge. The NOPE therefore behaves as a null threshold set from label shuffles, closer to a permutation test than to a statement of practical significance.
+
+If you know the smallest effect that matters, pass it as a fixed NOPE bound, which plays the role of Kruschke's preset region: a number above 1 for `nope` on \(R\), or a number above 0 for `energyNope` on \(E\). For \(E\), `ComputeEnergyNopeBound()` turns a composition shift into a bound: give it the reference and shifted compositions, and it returns \(2(1 - \mathrm{BC})\) with Bhattacharyya coefficient \(\mathrm{BC} = \sum_k \sqrt{p_k q_k}\). The bound is exact when every subject sits at its group's mean and approximate otherwise. Fixed edges need no shuffles and work for groups too small for the NOPE; when neither statistic keeps a NOPE, the run draws no extra random numbers. The worked example below shows the default NOPEs and fixed edges side by side.
+
+### Energy distance alongside the ratio
+
+Both methods also report the energy distance between groups. We build it from the same subject distance matrix as \(R\), but square each Hellinger distance first:
+
+\[
+E = 2\,\overline{H^2}_{12} - \overline{H^2}_{11} - \overline{H^2}_{22}.
+\]
+
+We average \(E\) over group pairs for the omnibus (`energyDistance`; Bayes adds `energyCiLow` and `energyCiHigh`). Squaring makes \(E\) the squared distance between the two group centroids in square-root composition space, less the sampling spread each centroid carries. \(R\) measures how far apart the groups are relative to how spread out they are, while \(E\) measures the shift in mean composition itself, with no division. If every subject sits at its group centroid, \(E = 2(1 - \mathrm{BC})\) between the centroids, which is why the fixed `energyNope` above can start from a composition shift. The sample estimate leaves out each subject's distance to itself, so it can dip slightly below 0 when groups do not differ.
+
+For a single two-group contrast with similar spread and depth in both groups, the two statistics usually lead to the same call. They part ways in a few common situations:
+
+- **Unequal heterogeneity.** If one condition (e.g. disease) is more variable than control, its spread dilutes \(R\) even when the shift is real; \(E\) reports the shift directly.
+- **Ranking contrasts.** When pairwise contrasts differ in within-group spread, ordering them by \(R\) mixes effect with noise; \(E\) orders them by the shift alone.
+- **Very homogeneous groups.** When subjects within each group are nearly identical, a tiny shift can produce a large \(R\); \(E\) shows that the shift is small in absolute terms.
+- **Different depths or studies.** Count noise at low depth adds to between- and within-group distances alike, which pulls \(R\) toward 1. With squared distances that noise cancels from \(E\) in expectation, although Jeffreys softening still shrinks both statistics at shallow depth. In the sampling-depth simulation, \(E\) keeps about half its noise-free value at 25 to 50 reads per subject, while the excess of \(R\) over 1 keeps about a third, so \(E\) compares more fairly across cohorts, batches, and studies.
+
+The trade runs the other way when groups differ in spread but not in mean composition: \(R\) and its tests respond strongly, while \(E\) moves only slightly. The p-values and `PPGT1` stay on \(R\); under Bayes, `E_PPGTnope` gives \(E\) its own NOPE, and \(R\) keeps its fold-change reading. The companion vignette, *Sampling depth, NOPE, and energy distance*, runs a simulation study of each situation above.
 
 ## Execution
 
 ### Build a synthetic long counts table
 
-We begin with a known enrichment structure. A synthetic long table carries one row per subject–category combination with columns `subjectId`, `category`, `group`, and `n`, matching the package's default long-table schema. Subjects are drawn from a multinomial allocation within each group so that, before enrichment is imposed, Control, Condition1, and Condition2 are approximately exchangeable. We then multiply counts in `Condition1` for `Category0` by a fixed factor, introducing a modest, known enrichment in that group alone. Condition2 is left unmodified, so its compositions remain exchangeable with Control under the generating process.
+We begin with a known enrichment structure. A synthetic long table carries one row per subject-category combination with columns `subjectId`, `category`, `group`, and `n`, matching the package's default long-table schema. We draw subjects from a multinomial allocation within each group, so Control, Condition1, and Condition2 are approximately exchangeable before we impose any enrichment. We then multiply counts in `Condition1` for `Category0` by a fixed factor, introducing a modest, known enrichment in that group alone. We leave Condition2 unmodified, so its compositions remain exchangeable with Control under the generating process.
 
 The internal functions `build_synthetic_long_table()` and `plant_group_structure()` live in the package namespace for vignette and test use; they are not exported, but they provide a reproducible procedure for simulating compositional cohorts.
 
@@ -148,13 +182,13 @@ head(long_table)
 table(unique(long_table[, c("subjectId", "group")])$group)
 ```
 
-Inspecting the head of the table confirms the long format: each subject contributes \(K\) rows (one per category), and the imposed enrichment appears as larger `n` in `Condition1` for `Category0` only. The subject–group table should show six subjects in each of the three groups.
+The head of the table confirms the long format: each subject contributes \(K\) rows (one per category), and the imposed enrichment appears as larger `n` in `Condition1` for `Category0` only. The subject-group table should show six subjects in each of the three groups.
 
 ### Extract compositions and run permutation inference
 
-The long table is aggregated to a `CategoryComposition` object: a subjects-by-categories count matrix with a named group factor. `ExtractClusterComposition()` performs that coercion and records provenance; missing subject–category combinations are zero-filled.
+`ExtractClusterComposition()` aggregates the long table to a `CategoryComposition` object, a subjects-by-categories count matrix with a named group factor. It records provenance and zero-fills missing subject-category combinations.
 
-`CompareGroupCompositions()` accepts either a `CategoryComposition` or a long table directly. Here we extract explicitly so the subject-scale object is visible before inference.
+`CompareGroupCompositions()` accepts either a `CategoryComposition` or a long table directly. Here we extract first so you can inspect the subject-scale object before inference.
 
 ```{r compare}
 composition <- ExtractClusterComposition(long_table)
@@ -172,11 +206,11 @@ perm_result$omnibus
 perm_result$contrasts
 ```
 
-The printed `HellingerEnrichmentResult` summarizes the omnibus ratio and p-value. `perm_result$omnibus` holds the global effect size and unadjusted p-value; `perm_result$contrasts` holds all three pairwise contrasts with Holm-adjusted `pAdj` columns, listed in the order the group-level pairs are generated: `r paste(perm_result$contrasts$contrastId, collapse = ", ")`. The imposed enrichment shows up clearly at the omnibus level (effect size `r round(perm_result$omnibus$effectSize, 2)`, p = `r format.pval(perm_result$omnibus$pValue, digits = 2, eps = 1e-4)`) and in both `Condition1` contrasts, for example `Condition1_vs_Control` (R = `r round(perm_result$contrasts$effectSize[perm_result$contrasts$contrastId == "Condition1_vs_Control"], 2)`, pAdj = `r format.pval(perm_result$contrasts$pAdj[perm_result$contrasts$contrastId == "Condition1_vs_Control"], digits = 2, eps = 1e-4)`). `Condition2_vs_Control`, the arm we never modified, sits at R = `r sprintf("%.2f", perm_result$contrasts$effectSize[perm_result$contrasts$contrastId == "Condition2_vs_Control"])` with pAdj = `r format.pval(perm_result$contrasts$pAdj[perm_result$contrasts$contrastId == "Condition2_vs_Control"], digits = 2, eps = 1e-4)`, consistent with exchangeability, exactly as expected for a group whose composition was never altered.
+The printed `HellingerEnrichmentResult` summarizes the omnibus ratio and p-value. `perm_result$omnibus` holds the global effect size and unadjusted p-value; `perm_result$contrasts` holds all three pairwise contrasts with Holm-adjusted `pAdj` columns, listed in the order the package generates group-level pairs: `r paste(perm_result$contrasts$contrastId, collapse = ", ")`. The imposed enrichment shows up at the omnibus level (effect size `r round(perm_result$omnibus$effectSize, 2)`, p = `r format.pval(perm_result$omnibus$pValue, digits = 2, eps = 1e-4)`) and in both `Condition1` contrasts, for example `Condition1_vs_Control` (R = `r round(perm_result$contrasts$effectSize[perm_result$contrasts$contrastId == "Condition1_vs_Control"], 2)`, pAdj = `r format.pval(perm_result$contrasts$pAdj[perm_result$contrasts$contrastId == "Condition1_vs_Control"], digits = 2, eps = 1e-4)`). `Condition2_vs_Control`, the arm we never modified, sits at R = `r sprintf("%.2f", perm_result$contrasts$effectSize[perm_result$contrasts$contrastId == "Condition2_vs_Control"])` with pAdj = `r format.pval(perm_result$contrasts$pAdj[perm_result$contrasts$contrastId == "Condition2_vs_Control"], digits = 2, eps = 1e-4)`, consistent with exchangeability for a group whose composition we never altered.
 
 ### Custom contrasts (and optional collapse)
 
-Default output already includes all pairwise contrasts. Custom entries in `contrasts=` add named specifications on top of that default set: a length-2 character vector selects a subset pairwise comparison, while a list with `groups` and/or `collapse` remaps or restricts group levels before distances are computed. With three groups, a natural custom specification names the two scientifically primary comparisons—enriched versus Control, and the unmodified group versus Control—under stable identifiers for downstream tables.
+Default output includes every pairwise contrast. Passing `contrasts` replaces that pairwise set with the comparisons you named; the omnibus test still runs. Holm adjustment on permutation `pAdj` then applies only to those rows. A length-2 character vector is enough for one pair (`c("Control", "Condition1")`). A named list helps when you want stable identifiers, or when a comparison is a collapse instead of a subset. With three groups, a natural planned family names the two primary comparisons: enriched versus Control, and the unmodified group versus Control.
 
 ```{r custom-contrasts}
 perm_custom <- CompareGroupCompositions(
@@ -193,7 +227,7 @@ perm_custom <- CompareGroupCompositions(
 perm_custom$contrasts
 ```
 
-The named contrasts reproduce those pairwise comparisons under user-chosen identifiers—useful when contrast tables are merged across analyses. Collapse becomes essential when experimental groups are relabeled for analysis (for example, merging dose cohorts into a single treated group) without rebuilding the count matrix by hand; see `?CompareGroupCompositions` for the `collapse` argument.
+`perm_custom$contrasts` contains those two rows instead of all three pairwises, so the unused `Condition1_vs_Condition2` comparison does not consume a Holm penalty. Set `includePairwise = TRUE` if you need the old overlay (named specs plus every pairwise). Collapse becomes essential when you relabel experimental groups for analysis (for example, merging dose cohorts into a single treated group) without rebuilding the count matrix by hand; see `?CompareGroupCompositions` for the `collapse` argument.
 
 ### Bayesian approach
 
@@ -211,31 +245,54 @@ bayes_result$omnibus
 bayes_result$contrasts
 ```
 
-Reading the Bayes output requires one adjustment: `bayes_result$omnibus$effectSize` is the posterior mean of \(R\), not the single observed ratio at the softened point estimate. The interval `effectCiLow`–`effectCiHigh` communicates whether \(R > 1\) remains stable under composition uncertainty. When the credible interval excludes 1, enrichment is supported and `PPGT1` is typically near 1. When the interval spans 1 but permutation p-values are small, sparse counts may be driving a fixed-composition signal that the Bayesian procedure correctly weakens.
+`bayes_result$omnibus$effectSize` is the posterior mean of \(R\) over the Dirichlet draws; the permutation result reports \(R\) at the softened point estimate. The interval `effectCiLow` to `effectCiHigh` is a 95% HPDI by default and shows whether \(R > 1\) holds up under composition uncertainty. When the interval excludes 1, `PPGT1` is typically near 1; the interval width and `bayes_result$omnibus$draws` show whether that exclusion is a hair above 1 or a large enrichment. When the interval spans 1 but permutation p-values are small, sparse counts may be driving a fixed-composition signal that the Bayesian procedure weakens. `R_PPGTnope` sharpens the first case: it asks whether \(R\) clears the edge that label shuffling routinely produces, so a posterior that sits a hair above 1 no longer reads as enrichment.
+
+To set the edges yourself, pass a number above 1 as `nope` and a number above 0 as `energyNope`. Here `ComputeEnergyNopeBound()` translates a 5-point composition shift on five even categories into an \(E\) bound:
+
+```{r bayes-fixed-nope}
+reference_composition <- rep(0.2, 5)
+shifted_composition <- c(0.15, 0.25, 0.2, 0.2, 0.2)
+energy_edge <- ComputeEnergyNopeBound(reference_composition, shifted_composition)
+energy_edge
+
+fixed_nope_result <- CompareGroupCompositions(
+  composition,
+  method = "bayes",
+  nPosterior = 20,
+  nope = 1.2,
+  energyNope = energy_edge,
+  seed = 42
+)
+fixed_nope_result$contrasts[, c("contrastId", "PPGT1", "R_PPGTnope", "R_nopeHigh", "E_PPGTnope", "E_nopeHigh")]
+```
+
+Every contrast now shares the edges \(R = 1.2\) and \(E\) = `r signif(energy_edge, 2)`. `PPGT1` differs slightly from `bayes_result` despite the same seed, because only the NOPE run consumed extra random numbers for its shuffles. Translating a meaningful shift into a ratio needs a simulation at your own depths and group sizes, because \(R\) also depends on within-group spread; the companion sampling-depth vignette shows how that spread moves \(R\).
 
 ### Plot contrasts
 
-`PlotCompositionContrasts()` visualizes contrast-level effect sizes. A dotted vertical line at \(R = 1\) marks the exchangeability reference under this metric. When `showOmnibus = TRUE` (default), the omnibus posterior-mean or observed ratio appears as a dashed reference with its p-value (permutation) or `PPGT1` (Bayes) annotated—contrasts can then be read against both unity and the global summary.
+`PlotCompositionContrasts()` stacks two panels that share the contrast rows: \(R\) on top and \(E\) below, each read left to right on its own axis. A dotted vertical line marks each statistic's no-difference value, \(R = 1\) and \(E = 0\). When `showOmnibus = TRUE` (default), a dashed line in each panel marks the omnibus value; the \(R\) panel labels it with the p-value (permutation) or `PPGT1` and `R_PPGTnope` (Bayes), and the \(E\) panel labels it with \(E\) and, under Bayes, `E_PPGTnope`. Set `showEnergyDistance = FALSE` for the ratio panel alone.
 
-```{r plot-perm, fig.cap="Permutation contrast panel with omnibus reference."}
+```{r plot-perm, fig.height = 6, fig.cap="Permutation contrasts on R (top) and E (bottom) with omnibus references."}
 PlotCompositionContrasts(perm_result)
 ```
 
-For permutation results, points are colored by whether Holm-adjusted `pAdj < 0.05`. For Bayes results, half-eye plots show the posterior density of each contrast's \(R\) with nested intervals.
+For permutation results, the plot colors points by whether Holm-adjusted `pAdj < 0.05`. For Bayes results, half-eye plots show the posterior density of each contrast's \(R\) and \(E\) with nested intervals, and a gray band behind each half-eye spans that statistic's NOPE, permutation-calibrated or fixed: from 1 to `R_nopeHigh` in the top panel and from 0 to `E_nopeHigh` in the bottom panel. The legend names each band: "NOPE (permutation)" for the default, where the band shows the median of the per-draw edges, or "NOPE (fixed)", in a darker gray, for a bound you supplied. The share of each slab right of its band approximates that statistic's NOPE probability; it matches exactly for a fixed edge, while the NOPE compares each draw with its own edge.
 
-```{r plot-bayes, fig.cap="Bayesian half-eye posterior densities for pairwise contrasts."}
+```{r plot-bayes, fig.height = 6, fig.cap="Bayesian half-eye posterior densities of R (top) and E (bottom), each with its NOPE band, for pairwise contrasts."}
 PlotCompositionContrasts(bayes_result)
 ```
 
-The two panels display the same ratio scale, each with method-appropriate uncertainty. Permutation emphasizes discrete significance against the label null; Bayes overlays composition uncertainty via half-eye densities of \(R\).
+The two figures share the same scales, each with uncertainty suited to its method. Permutation marks discrete significance against the label null; Bayes shows composition uncertainty as half-eye densities of \(R\) and \(E\). Reading the panels together separates the size of a shift (\(E\)) from how far it stands out against within-group spread (\(R\)).
 
 ### Closing interpretation
 
-On this synthetic cohort, both approaches recover the imposed `Condition1` enrichment in `Category0`: the omnibus ratio and both `Condition1` contrasts sit well above 1, with permutation p-values and Bayesian intervals agreeing that the shift is real rather than label noise. `Condition2_vs_Control` behaves as expected for a group that was never modified, and the two methods agree on it: permutation returns R = `r sprintf("%.2f", perm_result$contrasts$effectSize[perm_result$contrasts$contrastId == "Condition2_vs_Control"])` with pAdj = `r format.pval(perm_result$contrasts$pAdj[perm_result$contrasts$contrastId == "Condition2_vs_Control"], digits = 2, eps = 1e-4)`, and the Bayesian interval spans 1 (`r sprintf("%.2f", bayes_result$contrasts$effectCiLow[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])`–`r sprintf("%.2f", bayes_result$contrasts$effectCiHigh[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])`) with PPGT1 = `r sprintf("%.2f", bayes_result$contrasts$PPGT1[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])`. A significant omnibus result therefore does not imply that every pairwise group differs from Control.
+On this synthetic cohort, both approaches recover the imposed `Condition1` enrichment in `Category0`: the omnibus ratio and both `Condition1` contrasts sit well above 1, with permutation p-values and Bayesian intervals agreeing that the shift is real. `Condition2_vs_Control` behaves as expected for a group that we never modified, and the two methods agree on it: permutation returns R = `r sprintf("%.2f", perm_result$contrasts$effectSize[perm_result$contrasts$contrastId == "Condition2_vs_Control"])` with pAdj = `r format.pval(perm_result$contrasts$pAdj[perm_result$contrasts$contrastId == "Condition2_vs_Control"], digits = 2, eps = 1e-4)`, and the Bayesian interval spans 1 (`r sprintf("%.2f", bayes_result$contrasts$effectCiLow[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])` to `r sprintf("%.2f", bayes_result$contrasts$effectCiHigh[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])`) with PPGT1 = `r sprintf("%.2f", bayes_result$contrasts$PPGT1[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])`, R_PPGTnope = `r sprintf("%.2f", bayes_result$contrasts$R_PPGTnope[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])`, and E_PPGTnope = `r sprintf("%.2f", bayes_result$contrasts$E_PPGTnope[bayes_result$contrasts$contrastId == "Condition2_vs_Control"])`. A significant omnibus result therefore does not imply that every pairwise group differs from Control. The energy distance gives the same reading in absolute units: `Condition1_vs_Control` separates by E = `r format(signif(perm_result$contrasts$energyDistance[perm_result$contrasts$contrastId == "Condition1_vs_Control"], 2), scientific = FALSE)` squared Hellinger units, while `Condition2_vs_Control` sits at E = `r format(signif(perm_result$contrasts$energyDistance[perm_result$contrasts$contrastId == "Condition2_vs_Control"], 2), scientific = FALSE)`.
 
-This result does not generalize to all real cohorts. Sparse categories, unequal cell yields, or violated exchangeability (for example, batch confounded with group) can produce ratios that look enriched under fixed compositions but fail to hold once Dirichlet uncertainty is propagated. In those settings, the Bayesian approach is the more conservative assessment of whether an apparent contrast survives sampling variation in the compositions themselves. It is also worth remembering that permutation targets a fixed \(\alpha\): a truly exchangeable group will cross a p < 0.05 threshold by chance alone roughly one draw in twenty, so an isolated marginal p-value from a single permutation run is not, on its own, strong evidence against exchangeability—propagating composition uncertainty through the Bayesian option is one way to check whether such a signal is more than sampling noise.
+These results come from one synthetic cohort, and Bayes can sit on either side of permutation. Sparse categories, unequal cell yields, or violated exchangeability (for example, batch confounded with group) can produce ratios that look enriched under fixed compositions but fail to hold once we propagate Dirichlet uncertainty; there, Bayes can weaken a permutation signal. Dense counts with \(R\) just above 1 produce the opposite disagreement: `PPGT1` can sit near 1 while the HPDI barely excludes 1, and permutation still reports a large p-value because labels remain compatible with exchangeability. `R_PPGTnope` targets this case: it stays low when the excess over 1 is no larger than what label shuffling produces. Permutation also targets a fixed \(\alpha\): an exchangeable group will cross a p < 0.05 threshold by chance alone roughly one run in twenty, so an isolated marginal p-value from a single permutation run is weak evidence against exchangeability. The interval and the draws are how you judge closeness to 1; `PPGT1` alone does not encode effect magnitude.
 
-Two practical constraints bound any analysis. First, each group must include at least two subjects, because within-group distances are defined from pairwise comparisons. Second, each subject must map to exactly one experimental group in the metadata; conflicting group labels for the same subject are rejected at composition build time. Within those constraints, the workflow—long counts, subject composition, contrast specification, ratio-based inference, and contrast plotting—extends from this synthetic example to real `ExtractClusterComposition()` inputs without changing the inferential definition of \(R\).
+## References
+
+Kruschke, J. K. (2018). Rejecting or accepting parameter values in Bayesian estimation. *Advances in Methods and Practices in Psychological Science*, 1(2), 270-280. <https://doi.org/10.1177/2515245918771304>. [Article page (APS)](https://www.psychologicalscience.org/journals/ampps/2515245918771304/); [open-access record (IU ScholarWorks)](https://scholarworks.iu.edu/dspace/items/bada026d-fe1b-4f53-ad5b-db6e8bf99711).
 
 ## Acknowledgments
 
