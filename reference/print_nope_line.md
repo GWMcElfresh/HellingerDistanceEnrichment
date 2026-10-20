@@ -40,7 +40,8 @@ print_nope_line(
 
 - omnibus:
 
-  The result's omnibus list, for `enoughShufflesForNope`.
+  The result's omnibus list, for `enoughShufflesForNope` and
+  `R_hdiAboveNope` or `E_hdiAboveNope`.
 
 ## Value
 

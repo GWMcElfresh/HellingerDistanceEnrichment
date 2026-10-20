@@ -158,8 +158,9 @@ Two levels of reporting matter in practice:
 - **Bayes:** `result$omnibus$PPGT1` and `result$contrasts$PPGT1` are the
   posterior probability that $`R > 1`$; `R_PPGTnope` and `E_PPGTnope`
   are the posterior probabilities that $`R`$ and $`E`$ clear their NOPE
-  edges (`R_nopeHigh`, `E_nopeHigh`). There is no `pAdj`;
-  `pAdjustMethod` is unused.
+  edges (`R_nopeHigh`, `E_nopeHigh`); `R_hdiAboveNope` and
+  `E_hdiAboveNope` are `TRUE` when the 95% HPDI sits entirely above that
+  reported edge. There is no `pAdj`; `pAdjustMethod` is unused.
 
 Omnibus and pairwise contrasts answer nested questions. A significant
 omnibus result indicates that at least some group separation exists
@@ -203,7 +204,9 @@ recomputes $`R`$ and $`E`$. Across `nPosterior` draws, it reports:
 - posterior probabilities that $`R`$ and $`E`$ clear their NOPE
   intervals, permutation-calibrated null reference intervals set by
   label shuffling (`R_PPGTnope`, `E_PPGTnope`), with the median upper
-  bound of each interval (`R_nopeHigh`, `E_nopeHigh`), described below,
+  bound of each interval (`R_nopeHigh`, `E_nopeHigh`) and whether the
+  95% HPDI sits entirely above that edge (`R_hdiAboveNope`,
+  `E_hdiAboveNope`), described below,
 - 95% highest posterior density interval on $`R`$ (`effectCiLow`,
   `effectCiHigh`), the shortest window containing 95% of the draws.
 
@@ -242,8 +245,8 @@ groups do not differ, the sample $`R`$ still lands a little above or
 below 1, and as depth grows the posterior shrinks onto that chance
 value. In the sampling-depth vignette’s simulation (10 categories, 8
 versus 8 subjects drawn from identical populations, 100 cohorts per
-depth), 27% of cohorts reported `PPGT1 > 0.95` at 2000 reads per subject
-and 25% at 500, against 1% at 50 reads per subject. A threshold of
+depth), 27% of cohorts reported `PPGT1 > 0.95` at 2000 cells per subject
+and 25% at 500, against 1% at 50 cells per subject. A threshold of
 exactly 1 therefore means something different at different depths.
 
 The defaults `nope = "shuffle"` and `energyNope = "shuffle"` set a
@@ -266,19 +269,23 @@ simulation the $`R`$ edge sat near 1.06 at every depth, and
 and `E_PPGTnope` the same for $`E`$; `R_nopeHigh` and `E_nopeHigh` are
 the median edges across draws. We floor each draw’s edge at the
 no-difference value (1 for $`R`$, 0 for $`E`$), so `R_PPGTnope` can
-never exceed `PPGT1`. We recommend reading the NOPE probabilities as the
-headline Bayes result and keeping `PPGT1` as the exchangeability
+never exceed `PPGT1`. The 95% HPDI (`effectCiLow` to `effectCiHigh`) is
+the credible interval on the statistic; the NOPE is the permutation null
+region. `R_hdiAboveNope` is `TRUE` when that HPDI sits entirely above
+the reported NOPE (`effectCiLow > R_nopeHigh`); `E_hdiAboveNope` is the
+same comparison for $`E`$. We recommend reading the NOPE probabilities
+as the headline Bayes result and keeping `PPGT1` as the exchangeability
 reference. Take heed of the threshold, though: a cutoff of 0.95 asks
 nearly every draw to clear its own shuffle edge, so it runs well below a
 5% false-positive rate and loses power, most of all at shallow depth
-(`R_PPGTnope > 0.95` detected 1% of 5-point shifts at 50 reads per
+(`R_PPGTnope > 0.95` detected 1% of 5-point shifts at 50 cells per
 subject, against 50% for the permutation test). In the same simulation
-`R_PPGTnope > 0.5` tracked the permutation test at 500 and 2000 reads,
+`R_PPGTnope > 0.5` tracked the permutation test at 500 and 2000 cells,
 and the sampling-depth vignette reports the same comparison for
-`E_PPGTnope`. Setting `nope` or `energyNope` to `"none"` drops that
-statistic’s columns. A fixed seed gives different posterior draws with
-and without a NOPE, because its shuffles consume random numbers between
-Dirichlet draws; fixed edges consume none.
+`E_PPGTnope` and for `R_hdiAboveNope`. Setting `nope` or `energyNope` to
+`"none"` drops that statistic’s columns. A fixed seed gives different
+posterior draws with and without a NOPE, because its shuffles consume
+random numbers between Dirichlet draws; fixed edges consume none.
 
 Very small groups cannot support a NOPE, for the same reason they cannot
 produce a small permutation p-value. With 3 versus 3 subjects there are
@@ -362,7 +369,7 @@ in a few common situations:
   With squared distances that noise cancels from $`E`$ in expectation,
   although Jeffreys softening still shrinks both statistics at shallow
   depth. In the sampling-depth simulation, $`E`$ keeps about half its
-  noise-free value at 25 to 50 reads per subject, while the excess of
+  noise-free value at 25 to 50 cells per subject, while the excess of
   $`R`$ over 1 keeps about a third, so $`E`$ compares more fairly across
   cohorts, batches, and studies.
 
@@ -561,11 +568,17 @@ bayes_result$omnibus
 #> $R_nopeHigh
 #> [1] 1.132811
 #> 
+#> $R_hdiAboveNope
+#> [1] TRUE
+#> 
 #> $E_PPGTnope
 #> [1] 1
 #> 
 #> $E_nopeHigh
 #> [1] 0.02083857
+#> 
+#> $E_hdiAboveNope
+#> [1] TRUE
 #> 
 #> $enoughShufflesForNope
 #> [1] TRUE
@@ -590,18 +603,18 @@ bayes_result$omnibus
 #>  [9] 1.699903 1.667526 1.766796 1.554594 1.616840 1.567226 1.592179 1.485177
 #> [17] 1.445179 1.719701 1.667845 1.583727
 bayes_result$contrasts
-#>                 contrastId effectSize PPGT1 R_PPGTnope R_nopeHigh E_PPGTnope
-#> 2 Condition1_vs_Condition2  2.1807057  1.00       1.00   1.271343       1.00
-#> 3    Condition1_vs_Control  2.0138347  1.00       1.00   1.250679       1.00
-#> 4    Condition2_vs_Control  0.9866097  0.25       0.05   1.142103       0.05
-#>    E_nopeHigh enoughShufflesForNope effectCiLow effectCiHigh energyDistance
-#> 2 0.041741391                  TRUE   1.9125217     2.461328   0.1263427672
-#> 3 0.036404736                  TRUE   1.7372538     2.263975   0.1075147607
-#> 4 0.007847746                  TRUE   0.9101125     1.058920  -0.0009219148
-#>    energyCiLow energyCiHigh
-#> 2  0.095355843   0.14684666
-#> 3  0.081307826   0.13075750
-#> 4 -0.007514817   0.00312827
+#>                 contrastId effectSize PPGT1 R_PPGTnope R_nopeHigh
+#> 2 Condition1_vs_Condition2  2.1807057  1.00       1.00   1.271343
+#> 3    Condition1_vs_Control  2.0138347  1.00       1.00   1.250679
+#> 4    Condition2_vs_Control  0.9866097  0.25       0.05   1.142103
+#>   R_hdiAboveNope E_PPGTnope  E_nopeHigh E_hdiAboveNope enoughShufflesForNope
+#> 2           TRUE       1.00 0.041741391           TRUE                  TRUE
+#> 3           TRUE       1.00 0.036404736           TRUE                  TRUE
+#> 4          FALSE       0.05 0.007847746          FALSE                  TRUE
+#>   effectCiLow effectCiHigh energyDistance  energyCiLow energyCiHigh
+#> 2   1.9125217     2.461328   0.1263427672  0.095355843   0.14684666
+#> 3   1.7372538     2.263975   0.1075147607  0.081307826   0.13075750
+#> 4   0.9101125     1.058920  -0.0009219148 -0.007514817   0.00312827
 ```
 
 `bayes_result$omnibus$effectSize` is the posterior mean of $`R`$ over

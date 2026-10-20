@@ -142,8 +142,8 @@ even when <code>contrasts</code> is supplied (the old additive overlay).</p></dd
 permutation-calibrated null reference interval whose upper bound comes from label
 shuffles within each posterior draw. A single number above 1 sets a fixed
 NOPE bound on \(R\) that you choose in advance.
-Either adds <code>R_PPGTnope</code> and <code>R_nopeHigh</code> to the output. <code>"none"</code> drops
-them. Ignored for permutation.</p></dd>
+Either adds <code>R_PPGTnope</code>, <code>R_nopeHigh</code>, and <code>R_hdiAboveNope</code> to the output.
+<code>"none"</code> drops them. Ignored for permutation.</p></dd>
 
 
 <dt id="arg-energynope">energyNope<a class="anchor" aria-label="anchor" href="#arg-energynope"></a></dt>
@@ -151,8 +151,8 @@ them. Ignored for permutation.</p></dd>
 squared Hellinger units. <code>"shuffle"</code> (default) sets a NOPE interval from
 the same label shuffles as <code>nope</code>. A single number above 0 sets a fixed
 NOPE bound on \(E\); <code><a href="ComputeEnergyNopeBound.html">ComputeEnergyNopeBound()</a></code> turns a composition shift
-into one. Either adds <code>E_PPGTnope</code> and
-<code>E_nopeHigh</code> to the output. <code>"none"</code> drops them. Ignored for permutation.</p></dd>
+into one. Either adds <code>E_PPGTnope</code>, <code>E_nopeHigh</code>, and <code>E_hdiAboveNope</code> to
+the output. <code>"none"</code> drops them. Ignored for permutation.</p></dd>
 
 
 <dt id="arg-nnopeshuffles">nNopeShuffles<a class="anchor" aria-label="anchor" href="#arg-nnopeshuffles"></a></dt>
@@ -172,15 +172,16 @@ when <code>method = "bayes"</code> and <code>nope</code> or
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A HellingerEnrichmentResult with omnibus summary, contrast table, and
 (Bayes only) long-format posterior <code>draws</code> including the omnibus draws.
-Bayes summaries carry <code>R_PPGTnope</code> and <code>R_nopeHigh</code> unless
-<code>nope = "none"</code>, <code>E_PPGTnope</code> and <code>E_nopeHigh</code> unless
+Bayes summaries carry <code>R_PPGTnope</code>, <code>R_nopeHigh</code>, and <code>R_hdiAboveNope</code> unless
+<code>nope = "none"</code>, <code>E_PPGTnope</code>, <code>E_nopeHigh</code>, and <code>E_hdiAboveNope</code> unless
 <code>energyNope = "none"</code> (each edge column is the median across draws of the
-per-draw upper edge), and <code>enoughShufflesForNope</code> when <code>nope</code> or <code>energyNope</code> is
-<code>"shuffle"</code> (<code>FALSE</code> when groups are too small for the NOPE, which is
-why the NOPE probabilities are then <code>NA</code>); <code>draws</code> carries the per-draw
-<code>R_nopeHigh</code> and <code>E_nopeHigh</code>. Both methods carry <code>energyDistance</code> beside
-the ratio <code>effectSize</code>; Bayes adds <code>energyCiLow</code>/<code>energyCiHigh</code> and
-per-draw <code>energyDistance</code> in <code>draws</code>.</p>
+per-draw upper edge; each <code>*_hdiAboveNope</code> is <code>TRUE</code> when the 95% HPDI sits
+entirely above that reported edge), and <code>enoughShufflesForNope</code> when <code>nope</code>
+or <code>energyNope</code> is <code>"shuffle"</code> (<code>FALSE</code> when groups are too small for the
+NOPE, which is why the NOPE probabilities and HDI logicals are then <code>NA</code>);
+<code>draws</code> carries the per-draw <code>R_nopeHigh</code> and <code>E_nopeHigh</code>. Both methods
+carry <code>energyDistance</code> beside the ratio <code>effectSize</code>; Bayes adds
+<code>energyCiLow</code>/<code>energyCiHigh</code> and per-draw <code>energyDistance</code> in <code>draws</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -215,9 +216,11 @@ ratio of Hellinger distances or an energy distance, so NOPE takes its upper
 bound from the data: the largest value of the statistic these subjects
 routinely produce when labels carry no information. The bound also differs
 from draw to draw, and each NOPE probability counts the draws that clear
-their own bound. NOPE therefore acts as a null reference calibrated by
-permutation, closer to a permutation test than to a statement of practical
-significance. When you know the smallest effect that matters, pass it as a
+their own bound. <code>R_hdiAboveNope</code> and <code>E_hdiAboveNope</code> report Kruschke's
+comparison against the reported region: <code>TRUE</code> when the 95% HPDI sits entirely
+above that statistic's NOPE (<code>effectCiLow &gt; R_nopeHigh</code>,
+<code>energyCiLow &gt; E_nopeHigh</code>). The HPDI is the credible interval; the NOPE is
+the null region. When you know the smallest effect that matters, pass it as a
 fixed NOPE bound, which plays the role of Kruschke's preset region:
 <code>nope = &lt;number above 1&gt;</code> on \(R\), or <code>energyNope = &lt;number above 0&gt;</code> on
 \(E\) in squared Hellinger units. A fixed bound needs no shuffles, so it
@@ -261,7 +264,7 @@ through that same curvature. The sample estimate excludes each subject's
 distance to itself, so it can dip slightly below 0 when groups do not
 differ. The p-values and <code>PPGT1</code> stay on \(R\); under Bayes the package
 reports a posterior interval on \(E\) (<code>energyCiLow</code>, <code>energyCiHigh</code>) and,
-with <code>energyNope</code>, <code>E_PPGTnope</code>.</p>
+with <code>energyNope</code>, <code>E_PPGTnope</code> and <code>E_hdiAboveNope</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

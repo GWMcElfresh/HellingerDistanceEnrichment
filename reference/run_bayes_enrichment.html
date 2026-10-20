@@ -71,7 +71,9 @@ posterior of the global ratio can be inspected alongside pairwise draws.</p>
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p><code>R_PPGTnope</code> compares each draw's \(R\) with that same draw's \(R\) edge,
 and <code>E_PPGTnope</code> does the same for \(E\); <code>R_nopeHigh</code> and <code>E_nopeHigh</code> in
-the summary are the medians of the per-draw edges. Shuffles consume the
+the summary are the medians of the per-draw edges. <code>R_hdiAboveNope</code> is
+<code>TRUE</code> when the 95% HPDI of \(R\) sits entirely above <code>R_nopeHigh</code>;
+<code>E_hdiAboveNope</code> is the same comparison for \(E\). Shuffles consume the
 random stream between Dirichlet draws, so a fixed seed gives different draws
 when <code>nope</code> or <code>energy_nope</code> is <code>"shuffle"</code> than when neither is.</p>
     </div>

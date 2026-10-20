@@ -275,7 +275,9 @@ probabilities that
 and
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
 clear their NOPE edges (<code>R_nopeHigh</code>,
-<code>E_nopeHigh</code>). There is no <code>pAdj</code>;
+<code>E_nopeHigh</code>); <code>R_hdiAboveNope</code> and
+<code>E_hdiAboveNope</code> are <code>TRUE</code> when the 95% HPDI sits
+entirely above that reported edge. There is no <code>pAdj</code>;
 <code>pAdjustMethod</code> is unused.</li>
 </ul>
 <p>Omnibus and pairwise contrasts answer nested questions. A significant
@@ -336,8 +338,9 @@ and
 clear their NOPE intervals, permutation-calibrated null reference
 intervals set by label shuffling (<code>R_PPGTnope</code>,
 <code>E_PPGTnope</code>), with the median upper bound of each interval
-(<code>R_nopeHigh</code>, <code>E_nopeHigh</code>), described
-below,</li>
+(<code>R_nopeHigh</code>, <code>E_nopeHigh</code>) and whether the 95%
+HPDI sits entirely above that edge (<code>R_hdiAboveNope</code>,
+<code>E_hdiAboveNope</code>), described below,</li>
 <li>95% highest posterior density interval on
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
 (<code>effectCiLow</code>, <code>effectCiHigh</code>), the shortest
@@ -388,8 +391,8 @@ still lands a little above or below 1, and as depth grows the posterior
 shrinks onto that chance value. In the sampling-depth vignette’s
 simulation (10 categories, 8 versus 8 subjects drawn from identical
 populations, 100 cohorts per depth), 27% of cohorts reported
-<code>PPGT1 &gt; 0.95</code> at 2000 reads per subject and 25% at 500,
-against 1% at 50 reads per subject. A threshold of exactly 1 therefore
+<code>PPGT1 &gt; 0.95</code> at 2000 cells per subject and 25% at 500,
+against 1% at 50 cells per subject. A threshold of exactly 1 therefore
 means something different at different depths.</p>
 <p>The defaults <code>nope = "shuffle"</code> and
 <code>energyNope = "shuffle"</code> set a Null-Oriented Permutation
@@ -421,17 +424,25 @@ for
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
 0 for
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>),
-so <code>R_PPGTnope</code> can never exceed <code>PPGT1</code>. We
-recommend reading the NOPE probabilities as the headline Bayes result
+so <code>R_PPGTnope</code> can never exceed <code>PPGT1</code>. The 95%
+HPDI (<code>effectCiLow</code> to <code>effectCiHigh</code>) is the
+credible interval on the statistic; the NOPE is the permutation null
+region. <code>R_hdiAboveNope</code> is <code>TRUE</code> when that HPDI
+sits entirely above the reported NOPE
+(<code>effectCiLow &gt; R_nopeHigh</code>); <code>E_hdiAboveNope</code>
+is the same comparison for
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>.
+We recommend reading the NOPE probabilities as the headline Bayes result
 and keeping <code>PPGT1</code> as the exchangeability reference. Take
 heed of the threshold, though: a cutoff of 0.95 asks nearly every draw
 to clear its own shuffle edge, so it runs well below a 5% false-positive
 rate and loses power, most of all at shallow depth
 (<code>R_PPGTnope &gt; 0.95</code> detected 1% of 5-point shifts at 50
-reads per subject, against 50% for the permutation test). In the same
+cells per subject, against 50% for the permutation test). In the same
 simulation <code>R_PPGTnope &gt; 0.5</code> tracked the permutation test
-at 500 and 2000 reads, and the sampling-depth vignette reports the same
-comparison for <code>E_PPGTnope</code>. Setting <code>nope</code> or
+at 500 and 2000 cells, and the sampling-depth vignette reports the same
+comparison for <code>E_PPGTnope</code> and for
+<code>R_hdiAboveNope</code>. Setting <code>nope</code> or
 <code>energyNope</code> to <code>"none"</code> drops that statistic’s
 columns. A fixed seed gives different posterior draws with and without a
 NOPE, because its shuffles consume random numbers between Dirichlet
@@ -546,7 +557,7 @@ toward 1. With squared distances that noise cancels from
 in expectation, although Jeffreys softening still shrinks both
 statistics at shallow depth. In the sampling-depth simulation,
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
-keeps about half its noise-free value at 25 to 50 reads per subject,
+keeps about half its noise-free value at 25 to 50 cells per subject,
 while the excess of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
 over 1 keeps about a third, so
@@ -749,11 +760,17 @@ should raise it so posterior means and intervals stabilize.</p>
 <span><span class="co">#&gt; $R_nopeHigh</span></span>
 <span><span class="co">#&gt; [1] 1.132811</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $R_hdiAboveNope</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $E_PPGTnope</span></span>
 <span><span class="co">#&gt; [1] 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $E_nopeHigh</span></span>
 <span><span class="co">#&gt; [1] 0.02083857</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $E_hdiAboveNope</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $enoughShufflesForNope</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span>
@@ -778,18 +795,18 @@ should raise it so posterior means and intervals stabilize.</p>
 <span><span class="co">#&gt;  [9] 1.699903 1.667526 1.766796 1.554594 1.616840 1.567226 1.592179 1.485177</span></span>
 <span><span class="co">#&gt; [17] 1.445179 1.719701 1.667845 1.583727</span></span>
 <span><span class="va">bayes_result</span><span class="op">$</span><span class="va">contrasts</span></span>
-<span><span class="co">#&gt;                 contrastId effectSize PPGT1 R_PPGTnope R_nopeHigh E_PPGTnope</span></span>
-<span><span class="co">#&gt; 2 Condition1_vs_Condition2  2.1807057  1.00       1.00   1.271343       1.00</span></span>
-<span><span class="co">#&gt; 3    Condition1_vs_Control  2.0138347  1.00       1.00   1.250679       1.00</span></span>
-<span><span class="co">#&gt; 4    Condition2_vs_Control  0.9866097  0.25       0.05   1.142103       0.05</span></span>
-<span><span class="co">#&gt;    E_nopeHigh enoughShufflesForNope effectCiLow effectCiHigh energyDistance</span></span>
-<span><span class="co">#&gt; 2 0.041741391                  TRUE   1.9125217     2.461328   0.1263427672</span></span>
-<span><span class="co">#&gt; 3 0.036404736                  TRUE   1.7372538     2.263975   0.1075147607</span></span>
-<span><span class="co">#&gt; 4 0.007847746                  TRUE   0.9101125     1.058920  -0.0009219148</span></span>
-<span><span class="co">#&gt;    energyCiLow energyCiHigh</span></span>
-<span><span class="co">#&gt; 2  0.095355843   0.14684666</span></span>
-<span><span class="co">#&gt; 3  0.081307826   0.13075750</span></span>
-<span><span class="co">#&gt; 4 -0.007514817   0.00312827</span></span></code></pre></div>
+<span><span class="co">#&gt;                 contrastId effectSize PPGT1 R_PPGTnope R_nopeHigh</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2  2.1807057  1.00       1.00   1.271343</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control  2.0138347  1.00       1.00   1.250679</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control  0.9866097  0.25       0.05   1.142103</span></span>
+<span><span class="co">#&gt;   R_hdiAboveNope E_PPGTnope  E_nopeHigh E_hdiAboveNope enoughShufflesForNope</span></span>
+<span><span class="co">#&gt; 2           TRUE       1.00 0.041741391           TRUE                  TRUE</span></span>
+<span><span class="co">#&gt; 3           TRUE       1.00 0.036404736           TRUE                  TRUE</span></span>
+<span><span class="co">#&gt; 4          FALSE       0.05 0.007847746          FALSE                  TRUE</span></span>
+<span><span class="co">#&gt;   effectCiLow effectCiHigh energyDistance  energyCiLow energyCiHigh</span></span>
+<span><span class="co">#&gt; 2   1.9125217     2.461328   0.1263427672  0.095355843   0.14684666</span></span>
+<span><span class="co">#&gt; 3   1.7372538     2.263975   0.1075147607  0.081307826   0.13075750</span></span>
+<span><span class="co">#&gt; 4   0.9101125     1.058920  -0.0009219148 -0.007514817   0.00312827</span></span></code></pre></div>
 <p><code>bayes_result$omnibus$effectSize</code> is the posterior mean of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
 over the Dirichlet draws; the permutation result reports

@@ -27,6 +27,8 @@ run_bayes_enrichment(
 `R_PPGTnope` compares each draw's \\R\\ with that same draw's \\R\\
 edge, and `E_PPGTnope` does the same for \\E\\; `R_nopeHigh` and
 `E_nopeHigh` in the summary are the medians of the per-draw edges.
+`R_hdiAboveNope` is `TRUE` when the 95% HPDI of \\R\\ sits entirely
+above `R_nopeHigh`; `E_hdiAboveNope` is the same comparison for \\E\\.
 Shuffles consume the random stream between Dirichlet draws, so a fixed
 seed gives different draws when `nope` or `energy_nope` is `"shuffle"`
 than when neither is.

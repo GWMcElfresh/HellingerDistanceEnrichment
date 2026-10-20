@@ -94,8 +94,8 @@ CompareGroupCompositions(
   permutation-calibrated null reference interval whose upper bound comes
   from label shuffles within each posterior draw. A single number above
   1 sets a fixed NOPE bound on \\R\\ that you choose in advance. Either
-  adds `R_PPGTnope` and `R_nopeHigh` to the output. `"none"` drops them.
-  Ignored for permutation.
+  adds `R_PPGTnope`, `R_nopeHigh`, and `R_hdiAboveNope` to the output.
+  `"none"` drops them. Ignored for permutation.
 
 - energyNope:
 
@@ -104,9 +104,9 @@ CompareGroupCompositions(
   shuffles as `nope`. A single number above 0 sets a fixed NOPE bound on
   \\E\\;
   [`ComputeEnergyNopeBound()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ComputeEnergyNopeBound.md)
-  turns a composition shift into one. Either adds `E_PPGTnope` and
-  `E_nopeHigh` to the output. `"none"` drops them. Ignored for
-  permutation.
+  turns a composition shift into one. Either adds `E_PPGTnope`,
+  `E_nopeHigh`, and `E_hdiAboveNope` to the output. `"none"` drops them.
+  Ignored for permutation.
 
 - nNopeShuffles:
 
@@ -124,13 +124,15 @@ CompareGroupCompositions(
 
 A HellingerEnrichmentResult with omnibus summary, contrast table, and
 (Bayes only) long-format posterior `draws` including the omnibus draws.
-Bayes summaries carry `R_PPGTnope` and `R_nopeHigh` unless
-`nope = "none"`, `E_PPGTnope` and `E_nopeHigh` unless
-`energyNope = "none"` (each edge column is the median across draws of
-the per-draw upper edge), and `enoughShufflesForNope` when `nope` or
-`energyNope` is `"shuffle"` (`FALSE` when groups are too small for the
-NOPE, which is why the NOPE probabilities are then `NA`); `draws`
-carries the per-draw `R_nopeHigh` and `E_nopeHigh`. Both methods carry
+Bayes summaries carry `R_PPGTnope`, `R_nopeHigh`, and `R_hdiAboveNope`
+unless `nope = "none"`, `E_PPGTnope`, `E_nopeHigh`, and `E_hdiAboveNope`
+unless `energyNope = "none"` (each edge column is the median across
+draws of the per-draw upper edge; each `*_hdiAboveNope` is `TRUE` when
+the 95% HPDI sits entirely above that reported edge), and
+`enoughShufflesForNope` when `nope` or `energyNope` is `"shuffle"`
+(`FALSE` when groups are too small for the NOPE, which is why the NOPE
+probabilities and HDI logicals are then `NA`); `draws` carries the
+per-draw `R_nopeHigh` and `E_nopeHigh`. Both methods carry
 `energyDistance` beside the ratio `effectSize`; Bayes adds
 `energyCiLow`/`energyCiHigh` and per-draw `energyDistance` in `draws`.
 
@@ -171,14 +173,17 @@ intuition for a ratio of Hellinger distances or an energy distance, so
 NOPE takes its upper bound from the data: the largest value of the
 statistic these subjects routinely produce when labels carry no
 information. The bound also differs from draw to draw, and each NOPE
-probability counts the draws that clear their own bound. NOPE therefore
-acts as a null reference calibrated by permutation, closer to a
-permutation test than to a statement of practical significance. When you
-know the smallest effect that matters, pass it as a fixed NOPE bound,
-which plays the role of Kruschke's preset region:
-`nope = <number above 1>` on \\R\\, or `energyNope = <number above 0>`
-on \\E\\ in squared Hellinger units. A fixed bound needs no shuffles, so
-it also works for groups too small for a NOPE interval.
+probability counts the draws that clear their own bound.
+`R_hdiAboveNope` and `E_hdiAboveNope` report Kruschke's comparison
+against the reported region: `TRUE` when the 95% HPDI sits entirely
+above that statistic's NOPE (`effectCiLow > R_nopeHigh`,
+`energyCiLow > E_nopeHigh`). The HPDI is the credible interval; the NOPE
+is the null region. When you know the smallest effect that matters, pass
+it as a fixed NOPE bound, which plays the role of Kruschke's preset
+region: `nope = <number above 1>` on \\R\\, or
+`energyNope = <number above 0>` on \\E\\ in squared Hellinger units. A
+fixed bound needs no shuffles, so it also works for groups too small for
+a NOPE interval.
 
 To set a fixed bound on \\E\\ from a composition shift, pass the
 reference and shifted compositions to ComputeEnergyNopeBound and hand
@@ -224,7 +229,7 @@ same curvature. The sample estimate excludes each subject's distance to
 itself, so it can dip slightly below 0 when groups do not differ. The
 p-values and `PPGT1` stay on \\R\\; under Bayes the package reports a
 posterior interval on \\E\\ (`energyCiLow`, `energyCiHigh`) and, with
-`energyNope`, `E_PPGTnope`.
+`energyNope`, `E_PPGTnope` and `E_hdiAboveNope`.
 
 ## References
 

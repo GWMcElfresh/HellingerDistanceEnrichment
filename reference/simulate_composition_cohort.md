@@ -1,9 +1,9 @@
 # Simulate a two-group cohort with controlled depth, heterogeneity, and shift.
 
 Each subject draws a latent composition from a Dirichlet centered on its
-group's mean composition, then draws `reads_per_subject` counts from a
+group's mean composition, then draws `cells_per_subject` counts from a
 multinomial on that composition. Three knobs separate the sources of
-variation the sampling vignette studies: `reads_per_subject` sets count
+variation the sampling vignette studies: `cells_per_subject` sets count
 noise within a subject, `concentration` sets how far subjects scatter
 around their group mean (larger is more homogeneous), and `shift` moves
 composition mass between two categories in the second group only.
@@ -14,7 +14,7 @@ composition mass between two categories in the second group only.
 simulate_composition_cohort(
   n_subjects_per_group = 8,
   n_categories = 10,
-  reads_per_subject = 2000,
+  cells_per_subject = 2000,
   concentration = 50,
   shift = 0,
   groups = c("Control", "Treatment"),
@@ -32,9 +32,9 @@ simulate_composition_cohort(
 
   Number of categories (\>= 2).
 
-- reads_per_subject:
+- cells_per_subject:
 
-  Multinomial count total per subject.
+  Multinomial count total per subject, typically cells (or events).
 
 - concentration:
 
@@ -57,7 +57,7 @@ simulate_composition_cohort(
 
 List with `long_table` (subjectId, category, group, n), `latent_counts`
 (subjects by categories latent compositions scaled to
-`reads_per_subject`, for noise-free reference statistics), and `group`
+`cells_per_subject`, for noise-free reference statistics), and `group`
 (named factor).
 
 ## Details
