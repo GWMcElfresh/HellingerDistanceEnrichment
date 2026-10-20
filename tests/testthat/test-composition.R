@@ -249,7 +249,7 @@ test_that("Bayes NOPE adds R_PPGTnope bounded above by PPGT1", {
     )
 
     expect_equal(result$settings$nope, "shuffle")
-    expect_true(all(c("R_PPGTnope", "R_nopeHigh", "enoughShufflesForNope") %in% colnames(result$contrasts)))
+    expect_true(all(c("R_PPGTnope", "R_nopeHigh", "R_hdiAboveNope", "enoughShufflesForNope") %in% colnames(result$contrasts)))
     expect_true(all(result$contrasts$enoughShufflesForNope))
     expect_true(result$omnibus$enoughShufflesForNope)
     expect_true("R_nopeHigh" %in% colnames(result$draws))
@@ -257,6 +257,9 @@ test_that("Bayes NOPE adds R_PPGTnope bounded above by PPGT1", {
     expect_true(all(result$contrasts$R_PPGTnope <= result$contrasts$PPGT1))
     expect_lte(result$omnibus$R_PPGTnope, result$omnibus$PPGT1)
     expect_gte(result$omnibus$R_nopeHigh, 1)
+    expect_type(result$omnibus$R_hdiAboveNope, "logical")
+    expect_equal(result$omnibus$R_hdiAboveNope, result$omnibus$effectCiLow > result$omnibus$R_nopeHigh)
+    expect_equal(result$contrasts$R_hdiAboveNope, result$contrasts$effectCiLow > result$contrasts$R_nopeHigh)
 })
 
 test_that("nope and energyNope = 'none' drop their NOPE columns", {
@@ -267,8 +270,8 @@ test_that("nope and energyNope = 'none' drop their NOPE columns", {
     )
 
     ratio_none <- CompareGroupCompositions(long_table, method = "bayes", nPosterior = 5, nope = "none", seed = 3)
-    expect_false(any(c("R_PPGTnope", "R_nopeHigh") %in% colnames(ratio_none$contrasts)))
-    expect_true(all(c("E_PPGTnope", "E_nopeHigh", "enoughShufflesForNope") %in% colnames(ratio_none$contrasts)))
+    expect_false(any(c("R_PPGTnope", "R_nopeHigh", "R_hdiAboveNope") %in% colnames(ratio_none$contrasts)))
+    expect_true(all(c("E_PPGTnope", "E_nopeHigh", "E_hdiAboveNope", "enoughShufflesForNope") %in% colnames(ratio_none$contrasts)))
 
     both_none <- CompareGroupCompositions(
         long_table,
@@ -278,7 +281,11 @@ test_that("nope and energyNope = 'none' drop their NOPE columns", {
         energyNope = "none",
         seed = 3
     )
-    nope_columns <- c("R_PPGTnope", "R_nopeHigh", "E_PPGTnope", "E_nopeHigh", "enoughShufflesForNope")
+    nope_columns <- c(
+        "R_PPGTnope", "R_nopeHigh", "R_hdiAboveNope",
+        "E_PPGTnope", "E_nopeHigh", "E_hdiAboveNope",
+        "enoughShufflesForNope"
+    )
     expect_true("PPGT1" %in% colnames(both_none$contrasts))
     expect_false(any(nope_columns %in% colnames(both_none$contrasts)))
     expect_false(any(c("R_nopeHigh", "E_nopeHigh") %in% colnames(both_none$draws)))
@@ -297,8 +304,9 @@ test_that("the E NOPE reports E_PPGTnope bounded by the share of draws with E ab
 
     result <- CompareGroupCompositions(long_table, method = "bayes", nPosterior = 12, nNopeShuffles = 30, seed = 55)
 
-    expect_true(all(c("E_PPGTnope", "E_nopeHigh") %in% colnames(result$contrasts)))
+    expect_true(all(c("E_PPGTnope", "E_nopeHigh", "E_hdiAboveNope") %in% colnames(result$contrasts)))
     expect_true(all(result$draws$E_nopeHigh >= 0))
+    expect_equal(result$contrasts$E_hdiAboveNope, result$contrasts$energyCiLow > result$contrasts$E_nopeHigh)
     for (contrast_id in result$contrasts$contrastId) {
         contrast_draws <- result$draws[result$draws$contrastId == contrast_id, ]
         contrast_row <- result$contrasts[result$contrasts$contrastId == contrast_id, ]
@@ -355,19 +363,21 @@ test_that("a fixed energyNope edge applies to every row and draw, alone or mixed
     )
     expect_true(all(is.finite(mixed$contrasts$R_PPGTnope)))
     expect_true(all(is.na(mixed$contrasts$E_PPGTnope)))
+    expect_equal(mixed$contrasts$R_hdiAboveNope, mixed$contrasts$effectCiLow > 1.2)
+    expect_true(all(is.na(mixed$contrasts$E_hdiAboveNope)))
     expect_false(any(mixed$contrasts$enoughShufflesForNope))
 })
 
 test_that("deeply sampled null cohorts do not clear the NOPE", {
-    # At 2000 reads per subject the Dirichlet posterior collapses onto the
+    # At 2000 cells per subject the Dirichlet posterior collapses onto the
     # sample R, so PPGT1 tracks the sign of chance noise around 1. The NOPE
     # edge from label shuffling absorbs that noise.
-    simulate_null_cohort <- function(n_per_group, n_categories, reads) {
+    simulate_null_cohort <- function(n_per_group, n_categories, cells) {
         rows <- list()
         for (group_label in c("A", "B")) {
             for (subject_idx in seq_len(n_per_group)) {
                 gamma_draws <- stats::rgamma(n_categories, shape = 5)
-                subject_counts <- stats::rmultinom(1, reads, gamma_draws / sum(gamma_draws))
+                subject_counts <- stats::rmultinom(1, cells, gamma_draws / sum(gamma_draws))
                 rows[[length(rows) + 1]] <- data.frame(
                     subjectId = paste0(group_label, subject_idx),
                     category = paste0("Category", seq_len(n_categories)),
@@ -382,7 +392,7 @@ test_that("deeply sampled null cohorts do not clear the NOPE", {
 
     set.seed(2026)
     omnibus_summaries <- t(replicate(4, {
-        null_table <- simulate_null_cohort(n_per_group = 8, n_categories = 10, reads = 2000)
+        null_table <- simulate_null_cohort(n_per_group = 8, n_categories = 10, cells = 2000)
         result <- CompareGroupCompositions(
             null_table,
             method = "bayes",
@@ -554,7 +564,9 @@ test_that("groups too small for the NOPE report NA with a warning", {
 
     expect_gt(result$omnibus$PPGT1, 0.9)
     expect_true(is.na(result$omnibus$R_PPGTnope))
+    expect_true(is.na(result$omnibus$R_hdiAboveNope))
     expect_true(all(is.na(result$contrasts$R_PPGTnope)))
+    expect_true(all(is.na(result$contrasts$R_hdiAboveNope)))
     expect_true(all(is.finite(result$contrasts$R_nopeHigh)))
     expect_false(result$omnibus$enoughShufflesForNope)
     expect_false(any(result$contrasts$enoughShufflesForNope))
@@ -582,6 +594,8 @@ test_that("a numeric nope sets a fixed edge without consuming random numbers", {
     # 3 versus 3 is too small for the NOPE, but a fixed edge still applies.
     expect_true(all(is.finite(fixed_result$contrasts$R_PPGTnope)))
     expect_true(all(fixed_result$contrasts$R_PPGTnope <= fixed_result$contrasts$PPGT1))
+    expect_equal(fixed_result$contrasts$R_hdiAboveNope, fixed_result$contrasts$effectCiLow > 1.2)
+    expect_output(print(fixed_result), "R_hdiAboveNope")
     expect_identical(fixed_result$draws$effectSize, none_result$draws$effectSize)
     expect_identical(fixed_result$contrasts$PPGT1, none_result$contrasts$PPGT1)
     expect_output(print(fixed_result), "fixed NOPE bound")

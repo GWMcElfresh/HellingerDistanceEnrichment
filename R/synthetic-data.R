@@ -59,9 +59,9 @@ build_synthetic_long_table <- function(n_subjects_per_group = 5,
 #' Simulate a two-group cohort with controlled depth, heterogeneity, and shift.
 #'
 #' Each subject draws a latent composition from a Dirichlet centered on its
-#' group's mean composition, then draws `reads_per_subject` counts from a
+#' group's mean composition, then draws `cells_per_subject` counts from a
 #' multinomial on that composition. Three knobs separate the sources of
-#' variation the sampling vignette studies: `reads_per_subject` sets count noise
+#' variation the sampling vignette studies: `cells_per_subject` sets count noise
 #' within a subject, `concentration` sets how far subjects scatter around their
 #' group mean (larger is more homogeneous), and `shift` moves composition mass
 #' between two categories in the second group only.
@@ -72,7 +72,8 @@ build_synthetic_long_table <- function(n_subjects_per_group = 5,
 #'
 #' @param n_subjects_per_group Subjects per group; length 1 or 2.
 #' @param n_categories Number of categories (>= 2).
-#' @param reads_per_subject Multinomial count total per subject.
+#' @param cells_per_subject Multinomial count total per subject, typically cells
+#'   (or events).
 #' @param concentration Dirichlet concentration per group; length 1 or 2.
 #' @param shift Composition mass moved in the second group, in [0, first
 #'   category's baseline share).
@@ -80,12 +81,12 @@ build_synthetic_long_table <- function(n_subjects_per_group = 5,
 #' @param seed Random seed, or `NULL` to use the current stream.
 #' @return List with `long_table` (subjectId, category, group, n),
 #'   `latent_counts` (subjects by categories latent compositions scaled to
-#'   `reads_per_subject`, for noise-free reference statistics), and `group`
+#'   `cells_per_subject`, for noise-free reference statistics), and `group`
 #'   (named factor).
 #' @keywords internal
 simulate_composition_cohort <- function(n_subjects_per_group = 8,
                                         n_categories = 10,
-                                        reads_per_subject = 2000,
+                                        cells_per_subject = 2000,
                                         concentration = 50,
                                         shift = 0,
                                         groups = c("Control", "Treatment"),
@@ -98,8 +99,8 @@ simulate_composition_cohort <- function(n_subjects_per_group = 8,
     }
     n_subjects_per_group <- rep_len(n_subjects_per_group, 2)
     concentration <- rep_len(concentration, 2)
-    if (any(n_subjects_per_group < 2) || any(concentration <= 0) || reads_per_subject < 1) {
-        stop("need at least 2 subjects per group, positive concentration, and at least 1 read")
+    if (any(n_subjects_per_group < 2) || any(concentration <= 0) || cells_per_subject < 1) {
+        stop("need at least 2 subjects per group, positive concentration, and at least 1 cell")
     }
 
     baseline_weights <- rev(seq_len(n_categories))
@@ -127,11 +128,11 @@ simulate_composition_cohort <- function(n_subjects_per_group = 8,
         for (subject_idx in seq_len(n_subjects_per_group[group_idx])) {
             gamma_draws <- stats::rgamma(n_categories, shape = alpha, rate = 1)
             latent_composition <- gamma_draws / sum(gamma_draws)
-            subject_counts <- as.vector(stats::rmultinom(1, reads_per_subject, latent_composition))
+            subject_counts <- as.vector(stats::rmultinom(1, cells_per_subject, latent_composition))
 
             subject_ids <- c(subject_ids, sprintf("%s_S%02d", groups[group_idx], subject_idx))
             subject_groups <- c(subject_groups, groups[group_idx])
-            latent_rows[[length(latent_rows) + 1]] <- latent_composition * reads_per_subject
+            latent_rows[[length(latent_rows) + 1]] <- latent_composition * cells_per_subject
             count_rows[[length(count_rows) + 1]] <- subject_counts
         }
     }
