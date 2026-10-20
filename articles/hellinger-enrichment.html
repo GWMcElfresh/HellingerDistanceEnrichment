@@ -34,6 +34,7 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/hellinger-enrichment.html">Hellinger enrichment for subject-level compositions</a></li>
+    <li><a class="dropdown-item" href="../articles/sampling-depth.html">Sampling depth, NOPE, and energy distance</a></li>
     <li><a class="dropdown-item" href="../articles/extract-metadata.html">Extracting compositions from Seurat and anndata</a></li>
   </ul>
 </li>
@@ -62,7 +63,7 @@ McElfresh</h4>
                         <h4 data-toc-skip class="author">Methods: Paul
 Edlefsen</h4>
             
-            <h4 data-toc-skip class="date">2026-09-28</h4>
+            <h4 data-toc-skip class="date">2026-10-20</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/GWMcElfresh/HellingerDistanceEnrichment/blob/HEAD/vignettes/hellinger-enrichment.Rmd" class="external-link"><code>vignettes/hellinger-enrichment.Rmd</code></a></small>
       <div class="d-none name"><code>hellinger-enrichment.Rmd</code></div>
@@ -71,40 +72,40 @@ Edlefsen</h4>
     
     
 <p>Understanding whether categorical compositions differ between
-experimental groups is critical when single-cell annotations are
-summarized to subject-level frequencies. However, the scale of inference
-is not the cell: it is the donor (or animal, or replicate) whose
-multinomial counts define a composition vector on a probability simplex.
-Cell-level cluster proportions can look sharply different while
-subject-level compositions remain exchangeable across groups, and the
-reverse can hold when sampling noise is large relative to an imposed
-enrichment. Real cohorts rarely reduce to a single pairwise comparison,
-so this vignette uses three groups: a Control, a Condition1 group with
-an imposed enrichment, and a Condition2 group that remains exchangeable
-with Control. Here, we illustrate
-<code>HellingerDistanceEnrichment</code> on that synthetic cohort,
-separating the conceptual framework (distance, ratio, contrasts,
-inference) from the worked analysis that recovers which comparisons are
-statistically different.</p>
+experimental groups is critical when you summarize single-cell
+annotations to subject-level frequencies. The unit of inference is the
+donor (or animal, or replicate), whose multinomial counts define a
+composition vector on a probability simplex. Cell-level cluster
+proportions can look sharply different while subject-level compositions
+remain exchangeable across groups, and the reverse can hold when
+sampling noise is large relative to an imposed enrichment. Real cohorts
+rarely reduce to a single pairwise comparison, so this vignette uses
+three groups: a Control, a Condition1 group with an imposed enrichment,
+and a Condition2 group that remains exchangeable with Control. Here, we
+illustrate <code>HellingerDistanceEnrichment</code> on that synthetic
+cohort, separating the conceptual framework (distance, ratio, contrasts,
+inference) from the worked analysis that recovers which comparisons
+differ.</p>
 <div class="section level2">
 <h2 id="concepts">Concepts<a class="anchor" aria-label="anchor" href="#concepts"></a>
 </h2>
-<p>The inferential core below—Hellinger geometry on Jeffreys-softened
-subject compositions, the between/within distance ratio
+<p>Paul Edlefsen developed the inferential core below: Hellinger
+geometry on Jeffreys-softened subject compositions, the between/within
+distance ratio
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
-observed-inclusive label permutation, and collapse/subset
-contrasts—follows methods developed by Paul Edlefsen. The Dirichlet
-Bayes option instead draws subject compositions from a conjugate
-posterior so composition uncertainty is not treated as fixed.</p>
+observed-inclusive label permutation, and collapse/subset contrasts. The
+Dirichlet Bayes option instead draws subject compositions from a
+conjugate posterior, so composition uncertainty carries into every
+statistic the package reports.</p>
 <div class="section level3">
-<h3 id="what-is-composition-enrichment">What is composition enrichment?<a class="anchor" aria-label="anchor" href="#what-is-composition-enrichment"></a>
+<h3 id="composition-enrichment">Composition enrichment<a class="anchor" aria-label="anchor" href="#composition-enrichment"></a>
 </h3>
 <p>Composition enrichment asks whether experimental groups occupy
-different regions of the simplex once cells have been aggregated to
-subjects. At the cell scale, each row carries a category label (cluster,
-cell type, module score bin) and metadata that links that cell to a
-subject and a group. At the subject scale, those labels become counts:
-for subject
+different regions of the simplex once you aggregate cells to subjects.
+At the cell scale, each row carries a category label (cluster, cell
+type, module score bin) and metadata that links that cell to a subject
+and a group. At the subject scale, those labels become counts: for
+subject
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>
 and category
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>,
@@ -114,14 +115,13 @@ cells (or events) in category
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>,
 and the subject’s composition is the normalized frequency vector
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>p</mi><mi>s</mi></msub><mo>=</mo><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mrow><mi>s</mi><mn>1</mn></mrow></msub><mo>,</mo><mi>…</mi><mo>,</mo><msub><mi>c</mi><mrow><mi>s</mi><mi>K</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo><mi>/</mi><msub><mo>∑</mo><mi>k</mi></msub><msub><mi>c</mi><mrow><mi>s</mi><mi>k</mi></mrow></msub></mrow><annotation encoding="application/x-tex">p_s = (c_{s1}, \ldots, c_{sK}) / \sum_k c_{sk}</annotation></semantics></math>.</p>
-<p>The scientific question is relational rather than descriptive. We are
-not asking which category is most abundant in one subject; we are asking
-whether between-group compositional distance exceeds within-group
-compositional distance across subjects. That framing mirrors
-pseudobulking in expression analysis: many cells collapse to one
-replicate-level observation, and hypothesis tests must respect the
-replicate as the unit of inference. A cluster that is enriched at the
-cell level within a single subject does not, by itself, establish
+<p>The scientific question is relational. We ask whether between-group
+compositional distance exceeds within-group compositional distance
+across subjects, and leave aside which category dominates any one
+subject. That framing mirrors pseudobulking in expression analysis: many
+cells collapse to one replicate-level observation, and hypothesis tests
+must respect the replicate as the unit of inference. A cluster enriched
+at the cell level within a single subject does not, by itself, establish
 group-level enrichment, because one subject’s multinomial draw can
 dominate the apparent pattern.</p>
 <p>This package tests enrichment by comparing the average pairwise
@@ -134,9 +134,9 @@ draws. Either way, the package breaks the result down into an omnibus
 summary and contrast-specific results.</p>
 </div>
 <div class="section level3">
-<h3 id="why-hellinger-distance">Why Hellinger distance?<a class="anchor" aria-label="anchor" href="#why-hellinger-distance"></a>
+<h3 id="hellinger-distance">Hellinger distance<a class="anchor" aria-label="anchor" href="#hellinger-distance"></a>
 </h3>
-<p>Once counts are normalized to frequencies, compositions live on a
+<p>Once you normalize counts to frequencies, compositions live on a
 simplex, and Euclidean distance on raw proportions is a poor geometry:
 scaling one category compresses the others, and small zeros carry
 disproportionate weight. Hellinger distance measures separation between
@@ -149,13 +149,13 @@ by comparing their square roots:</p>
 H(p,q)=\frac{1}{\sqrt{2}}\left\lVert\sqrt{p}-\sqrt{q}\right\rVert_2 \in [0,1].
 </annotation></semantics></math></p>
 <p>Values near 0 indicate similar compositions; values near 1 indicate
-near-disjoint support. The implementation computes
+near-disjoint support. The package computes
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math>
-from count vectors by forming frequencies internally, so the distance is
-always taken on normalized compositions rather than raw counts.</p>
+from count vectors by forming frequencies internally, so it measures
+distance on normalized compositions, never on raw counts.</p>
 <p>Sparse categories create a second problem: empirical frequencies of
-zero are not credible endpoints when counts are small. Before distances
-are evaluated, counts are softened with a Jeffreys-style pseudocount.
+zero are not credible endpoints when counts are small. Before computing
+distances, the package softens counts with a Jeffreys-style pseudocount.
 For subject
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>,
 category
@@ -170,29 +170,29 @@ p_{sk} = \frac{\tilde{c}_{sk}}{\sum_j \tilde{c}_{sj}}.
 conjugate Dirichlet prior used in the Bayesian approach. Softening pulls
 extreme proportions toward the simplex center and stabilizes pairwise
 distances when some categories are rarely observed.</p>
-<p>Hellinger distance is appropriate for asking whether compositions are
-separable in frequency space. It does not, by itself, identify which
-category drives a contrast, establish causality, or correct for
-differences in total cell yield between subjects beyond what is encoded
-in the normalized frequencies. Biological interpretation still requires
-knowing what the categories represent and whether the aggregation level
-matches the experimental question.</p>
+<p>Hellinger distance answers whether compositions are separable in
+frequency space. It does not, by itself, identify which category drives
+a contrast, establish causality, or correct for differences in total
+cell yield between subjects beyond what the normalized frequencies
+encode. Biological interpretation still requires knowing what the
+categories represent and whether the aggregation level matches the
+experimental question.</p>
 </div>
 <div class="section level3">
-<h3 id="what-is-the-enrichment-ratio">What is the enrichment ratio?<a class="anchor" aria-label="anchor" href="#what-is-the-enrichment-ratio"></a>
+<h3 id="the-enrichment-ratio">The enrichment ratio<a class="anchor" aria-label="anchor" href="#the-enrichment-ratio"></a>
 </h3>
 <p>Given a subjects-by-categories count matrix, the package builds a
 symmetric subject-level Hellinger distance matrix
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>D</mi><annotation encoding="application/x-tex">D</annotation></semantics></math>,
 where
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mrow><mi>s</mi><msup><mi>s</mi><mo>′</mo></msup></mrow></msub><mo>=</mo><mi>H</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>p</mi><mi>s</mi></msub><mo>,</mo><msub><mi>p</mi><msup><mi>s</mi><mo>′</mo></msup></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">D_{ss'} = H(p_s, p_{s'})</annotation></semantics></math>
-using softened, normalized compositions. Subjects are then grouped by
+using softened, normalized compositions. It then groups subjects by
 experimental label
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>.
-For each group pair
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>g</mi><annotation encoding="application/x-tex">g</annotation></semantics></math>
+and, for each group pair
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>g</mi><mo>,</mo><msup><mi>g</mi><mo>′</mo></msup><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(g, g')</annotation></semantics></math>,
-the package summarizes distances as mean pairwise Hellinger distance
-within or between subject sets:</p>
+summarizes distances as mean pairwise Hellinger distance within or
+between subject sets:</p>
 <ul>
 <li>
 <strong>Within-group</strong> (diagonal of the group summary): mean
@@ -224,33 +224,38 @@ subjects in different groups are farther apart, on average, than
 subjects within the same group under this metric. When
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>≈</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R \approx 1</annotation></semantics></math>,
 group labels are consistent with exchangeable compositions relative to
-the observed within-group dispersion. The ratio is defined over pairwise
+the observed within-group dispersion. The ratio rests on pairwise
 subject distances, so each group must contribute at least two subjects;
 otherwise within-group means are not identifiable and inference stops
 with an error.</p>
 <p>This ratio is the test statistic for both permutation and Bayes
 methods. It compresses a full distance matrix into a single scale-free
-quantity that can be compared across contrasts and posterior draws.</p>
+quantity that you can compare across contrasts and posterior draws.</p>
 </div>
 <div class="section level3">
-<h3 id="what-is-a-contrast">What is a contrast?<a class="anchor" aria-label="anchor" href="#what-is-a-contrast"></a>
+<h3 id="contrasts">Contrasts<a class="anchor" aria-label="anchor" href="#contrasts"></a>
 </h3>
-<p>A contrast is a specified comparison among group labels on which
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
-is evaluated. The package always computes an <strong>omnibus</strong>
-contrast that includes all group levels present in the composition
-object. For
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>G</mi><annotation encoding="application/x-tex">G</annotation></semantics></math>
-groups, it also computes all <strong>pairwise</strong> contrasts
+<p>A contrast is a specified comparison among group labels on which the
+package evaluates
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.
+The package always computes an <strong>omnibus</strong> contrast that
+includes all group levels present in the composition object. Without
+<code>contrasts</code>, it also computes all <strong>pairwise</strong>
+contrasts
 (<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="true" form="prefix">(</mo><mfrac linethickness="0"><mi>G</mi><mn>2</mn></mfrac><mo stretchy="true" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\binom{G}{2}</annotation></semantics></math>
-comparisons) unless additional custom specifications are supplied.</p>
+comparisons). If you pass <code>contrasts</code>, those specifications
+become the contrast family: the package skips auto pairwises, so you pay
+the permutation Holm adjustment only on the comparisons you named. Set
+<code>includePairwise = TRUE</code> if you still want the full pairwise
+set in addition to your specs.</p>
 <p>The analogy to differential expression is deliberate but not exact.
 In DE, a contrast selects linear combinations of model coefficients on
 log-expression. Here, a contrast selects which subjects enter the
-between/within distance summaries—either all groups (omnibus), a pair of
-groups (subset), or a remapped grouping (collapse). Custom contrasts are
-passed as a <strong>named list</strong> to <code>contrasts=</code>;
-names become <code>contrastId</code> values in the result.</p>
+between/within distance summaries: all groups (omnibus), a pair of
+groups (subset), or a remapped grouping (collapse). A length-2 character
+vector is one pairwise comparison. A list may mix those vectors with
+collapse or subset lists; names become <code>contrastId</code> values,
+and unnamed elements get <code>A_vs_B</code> identifiers.</p>
 <p>Two levels of reporting matter in practice:</p>
 <ul>
 <li>
@@ -263,9 +268,15 @@ across the contrast table by default
 <li>
 <strong>Bayes:</strong> <code>result$omnibus$PPGT1</code> and
 <code>result$contrasts$PPGT1</code> are the posterior probability that
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>.
-There is no <code>pAdj</code>; <code>pAdjustMethod</code> is
-unused.</li>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>;
+<code>R_PPGTnope</code> and <code>E_PPGTnope</code> are the posterior
+probabilities that
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+clear their NOPE edges (<code>R_nopeHigh</code>,
+<code>E_nopeHigh</code>). There is no <code>pAdj</code>;
+<code>pAdjustMethod</code> is unused.</li>
 </ul>
 <p>Omnibus and pairwise contrasts answer nested questions. A significant
 omnibus result indicates that at least some group separation exists
@@ -274,19 +285,20 @@ with multiplicity control on the contrast table rather than on the
 omnibus line.</p>
 </div>
 <div class="section level3">
-<h3 id="permutation-vs-bayes-related-but-non-equivalent-questions">Permutation vs Bayes: related but non-equivalent questions<a class="anchor" aria-label="anchor" href="#permutation-vs-bayes-related-but-non-equivalent-questions"></a>
+<h3 id="permutation-and-bayes-answer-different-questions">Permutation and Bayes answer different questions<a class="anchor" aria-label="anchor" href="#permutation-and-bayes-answer-different-questions"></a>
 </h3>
 <p>Both methods use the same between/within ratio
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
-but they differ in whether composition vectors are treated as fixed.</p>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>;
+they differ in whether they hold composition vectors fixed.</p>
 <p><strong>Permutation (<code>method = "permutation"</code>).</strong>
-Compositions are estimated once from softened counts, fixing the subject
-distance matrix. Group labels are permuted among subjects
+The package estimates compositions once from softened counts, which
+fixes the subject distance matrix. It then permutes group labels among
+subjects
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
-times (<code>nPermutations</code>), and
+times (<code>nPermutations</code>) and recomputes
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
-is recomputed on each shuffle. The one-sided p-value includes the
-observed statistic in the numerator:</p>
+on each shuffle. The one-sided p-value includes the observed statistic
+in the numerator:</p>
 <p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>p</mi><mo>=</mo><mfrac><mrow><mi>#</mi><mo stretchy="false" form="prefix">{</mo><msub><mi>R</mi><mrow><mi mathvariant="normal">p</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">m</mi></mrow></msub><mo>≥</mo><msub><mi>R</mi><mrow><mi mathvariant="normal">o</mi><mi mathvariant="normal">b</mi><mi mathvariant="normal">s</mi></mrow></msub><mo stretchy="false" form="postfix">}</mo><mo>+</mo><mn>1</mn></mrow><mrow><mi>B</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mi>.</mi></mrow><annotation encoding="application/x-tex">
 p=\frac{\#\{R_{\mathrm{perm}}\ge R_{\mathrm{obs}}\}+1}{B+1}.
 </annotation></semantics></math></p>
@@ -294,8 +306,8 @@ p=\frac{\#\{R_{\mathrm{perm}}\ge R_{\mathrm{obs}}\}+1}{B+1}.
 <strong>given</strong> the estimated compositions. It does not propagate
 uncertainty in the multinomial allocation of cells to categories.</p>
 <p><strong>Bayes (<code>method = "bayes"</code>).</strong> For each
-posterior draw, subject compositions are sampled from a conjugate
-Dirichlet posterior. With Jeffreys increment
+posterior draw, the package samples subject compositions from a
+conjugate Dirichlet posterior. With Jeffreys increment
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>,</p>
 <p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>p</mi><mi>s</mi></msub><mo>∼</mo><mrow><mi mathvariant="normal">D</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">r</mi><mi mathvariant="normal">i</mi><mi mathvariant="normal">c</mi><mi mathvariant="normal">h</mi><mi mathvariant="normal">l</mi><mi mathvariant="normal">e</mi><mi mathvariant="normal">t</mi></mrow><mo stretchy="false" form="prefix">(</mo><msub><mi>c</mi><mrow><mi>s</mi><mo>⋅</mo></mrow></msub><mo>+</mo><mi>α</mi><mo stretchy="false" form="postfix">)</mo><mo>,</mo></mrow><annotation encoding="application/x-tex">
 p_s \sim \mathrm{Dirichlet}(c_{s\cdot} + \alpha),
@@ -304,10 +316,12 @@ p_s \sim \mathrm{Dirichlet}(c_{s\cdot} + \alpha),
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>c</mi><mrow><mi>s</mi><mo>⋅</mo></mrow></msub><annotation encoding="application/x-tex">c_{s\cdot}</annotation></semantics></math>
 is the count vector for subject
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>.
-A full Hellinger distance matrix is rebuilt from that draw and
+The package rebuilds the full Hellinger distance matrix from that draw
+and recomputes
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
-is recomputed. Across <code>nPosterior</code> draws, the package
-reports:</p>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>.
+Across <code>nPosterior</code> draws, it reports:</p>
 <ul>
 <li>posterior-mean
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
@@ -315,19 +329,244 @@ reports:</p>
 <li>posterior probability that
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>
 (<code>PPGT1</code>),</li>
-<li>95% credible interval on
+<li>posterior probabilities that
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
-(<code>effectCiLow</code>, <code>effectCiHigh</code>).</li>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+clear their NOPE intervals, permutation-calibrated null reference
+intervals set by label shuffling (<code>R_PPGTnope</code>,
+<code>E_PPGTnope</code>), with the median upper bound of each interval
+(<code>R_nopeHigh</code>, <code>E_nopeHigh</code>), described
+below,</li>
+<li>95% highest posterior density interval on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+(<code>effectCiLow</code>, <code>effectCiHigh</code>), the shortest
+window containing 95% of the draws.</li>
 </ul>
-<p>By sampling compositions rather than fixing them, the Bayesian
+<p><code>PPGT1</code> is
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>P</mi><mo stretchy="false" form="prefix">(</mo><mi>R</mi><mo>&gt;</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">P(R &gt; 1)</annotation></semantics></math>.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R = 1</annotation></semantics></math>
+is the exchangeability reference for the metric (between-group distances
+match within-group distances on average), not a threshold for a
+practically large enrichment. You read closeness to 1 from the interval
+and from the posterior draws, including
+<code>result$omnibus$draws</code> and the <code>omnibus</code> rows of
+<code>result$draws</code>. Equal-tailed central posterior intervals
+remain available via <code>credibleInterval = "cpi"</code>. HPDI is the
+better default when the posterior of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+is asymmetric near 1, because a quantile interval spends equal mass in
+both tails even if one tail is a long, empty stretch.</p>
+<p>By sampling compositions instead of fixing them, the Bayesian
 approach propagates multinomial uncertainty into
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.
 When counts are sparse, that can widen credible intervals or lower
 <code>PPGT1</code> relative to a permutation p-value on the point
-estimate, even when point ratios look similar. When counts are dense and
-the imposed enrichment is strong, as in the synthetic example below, the
-two approaches often agree on which contrasts are elevated, though they
-still answer formally different questions.</p>
+estimate, even when point ratios look similar. When counts are dense,
+Dirichlet draws concentrate around the same frequencies used by
+permutation, so a ratio that sits only slightly above 1 can still have
+<code>PPGT1</code> near 1: composition-sampling noise is small relative
+to a 1-2% bump in
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
+while label permutation still finds that bump easy to produce by chance.
+The two methods then disagree without either being misspecified, because
+they answer formally different questions. With dense counts and a strong
+imposed enrichment, as in the synthetic example below, they often agree
+on which contrasts rise above 1.</p>
+</div>
+<div class="section level3">
+<h3 id="nope-a-permutation-calibrated-null-reference-for-the-bayes-output">NOPE: a permutation-calibrated null reference for the Bayes
+output<a class="anchor" aria-label="anchor" href="#nope-a-permutation-calibrated-null-reference-for-the-bayes-output"></a>
+</h3>
+<p>Dense counts are the usual case for single-cell data, where each
+subject contributes hundreds or thousands of cells, and that is where
+<code>PPGT1</code> misleads. The Dirichlet posterior only describes
+count noise within each subject, so it treats the sampled subjects as
+the whole population. If groups do not differ, the sample
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+still lands a little above or below 1, and as depth grows the posterior
+shrinks onto that chance value. In the sampling-depth vignette’s
+simulation (10 categories, 8 versus 8 subjects drawn from identical
+populations, 100 cohorts per depth), 27% of cohorts reported
+<code>PPGT1 &gt; 0.95</code> at 2000 reads per subject and 25% at 500,
+against 1% at 50 reads per subject. A threshold of exactly 1 therefore
+means something different at different depths.</p>
+<p>The defaults <code>nope = "shuffle"</code> and
+<code>energyNope = "shuffle"</code> set a Null-Oriented Permutation
+Equivalence (NOPE) interval on each statistic: a permutation-calibrated
+null reference interval for conditional effects. The interval is
+conditional in two senses: on the observed design (group sizes, depths,
+within-group spread) and on each posterior draw’s compositions. The goal
+parallels a permutation test, but NOPE reports a region instead of a
+p-value. Within each posterior draw, the package shuffles group labels
+<code>nNopeShuffles</code> times (default 200) on that draw’s distance
+matrix and takes the 95th percentile of the shuffled
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+and of the shuffled
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+as the upper edges of their NOPEs. Shuffling keeps the group sizes,
+depths, number of categories, and within-group spread, so each edge is
+the largest value these subjects routinely produce when labels carry no
+information; in that simulation the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+edge sat near 1.06 at every depth, and <code>R_PPGTnope &gt; 0.95</code>
+fired in at most 1% of the null cohorts.</p>
+<p><code>R_PPGTnope</code> is the posterior probability that
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+clears its edge, and <code>E_PPGTnope</code> the same for
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>;
+<code>R_nopeHigh</code> and <code>E_nopeHigh</code> are the median edges
+across draws. We floor each draw’s edge at the no-difference value (1
+for
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
+0 for
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>),
+so <code>R_PPGTnope</code> can never exceed <code>PPGT1</code>. We
+recommend reading the NOPE probabilities as the headline Bayes result
+and keeping <code>PPGT1</code> as the exchangeability reference. Take
+heed of the threshold, though: a cutoff of 0.95 asks nearly every draw
+to clear its own shuffle edge, so it runs well below a 5% false-positive
+rate and loses power, most of all at shallow depth
+(<code>R_PPGTnope &gt; 0.95</code> detected 1% of 5-point shifts at 50
+reads per subject, against 50% for the permutation test). In the same
+simulation <code>R_PPGTnope &gt; 0.5</code> tracked the permutation test
+at 500 and 2000 reads, and the sampling-depth vignette reports the same
+comparison for <code>E_PPGTnope</code>. Setting <code>nope</code> or
+<code>energyNope</code> to <code>"none"</code> drops that statistic’s
+columns. A fixed seed gives different posterior draws with and without a
+NOPE, because its shuffles consume random numbers between Dirichlet
+draws; fixed edges consume none.</p>
+<p>Very small groups cannot support a NOPE, for the same reason they
+cannot produce a small permutation p-value. With 3 versus 3 subjects
+there are only 10 distinct ways to split them, so the true split alone
+is 10% of all shuffles and neither statistic can clear its 95th
+percentile. If the true split is at least 5% of shuffles, the package
+warns, reports both NOPE probabilities as <code>NA</code> instead of a
+misleading 0, and sets <code>enoughShufflesForNope</code> to
+<code>FALSE</code> so the reason stays attached to the result; 4 versus
+4 is the smallest balanced design that supports it.</p>
+</div>
+<div class="section level3">
+<h3 id="nope-and-kruschkes-rope">NOPE and Kruschke’s ROPE<a class="anchor" aria-label="anchor" href="#nope-and-kruschkes-rope"></a>
+</h3>
+<p>NOPE borrows the equivalence logic of Kruschke’s region of practical
+equivalence, or ROPE (<a href="https://www.psychologicalscience.org/journals/ampps/2515245918771304/" class="external-link">Kruschke,
+2018</a>, <em>Advances in Methods and Practices in Psychological
+Science</em> 1:270-280) and departs from his procedure in two ways. In
+Kruschke’s ROPE, the analyst fixes the region before seeing the data,
+from domain knowledge of which effects are negligible, and the decision
+compares the 95% highest density interval with that region. That works
+when the parameter has familiar units, such as a difference in means.
+Few of us have that intuition for a ratio of mean Hellinger distances or
+for an energy distance, so the NOPE takes its edge from the data: the
+largest value of the statistic these subjects routinely produce when
+group labels carry no information. The edge also differs from draw to
+draw, and each NOPE probability counts the draws that clear their own
+edge. The NOPE therefore behaves as a null threshold set from label
+shuffles, closer to a permutation test than to a statement of practical
+significance.</p>
+<p>If you know the smallest effect that matters, pass it as a fixed NOPE
+bound, which plays the role of Kruschke’s preset region: a number above
+1 for <code>nope</code> on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
+or a number above 0 for <code>energyNope</code> on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>.
+For
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>,
+<code><a href="../reference/ComputeEnergyNopeBound.html">ComputeEnergyNopeBound()</a></code> turns a composition shift into a
+bound: give it the reference and shifted compositions, and it returns
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>2</mn><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>−</mo><mrow><mi mathvariant="normal">B</mi><mi mathvariant="normal">C</mi></mrow><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">2(1 - \mathrm{BC})</annotation></semantics></math>
+with Bhattacharyya coefficient
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mi mathvariant="normal">B</mi><mi mathvariant="normal">C</mi></mrow><mo>=</mo><msub><mo>∑</mo><mi>k</mi></msub><msqrt><mrow><msub><mi>p</mi><mi>k</mi></msub><msub><mi>q</mi><mi>k</mi></msub></mrow></msqrt></mrow><annotation encoding="application/x-tex">\mathrm{BC} = \sum_k \sqrt{p_k q_k}</annotation></semantics></math>.
+The bound is exact when every subject sits at its group’s mean and
+approximate otherwise. Fixed edges need no shuffles and work for groups
+too small for the NOPE; when neither statistic keeps a NOPE, the run
+draws no extra random numbers. The worked example below shows the
+default NOPEs and fixed edges side by side.</p>
+</div>
+<div class="section level3">
+<h3 id="energy-distance-alongside-the-ratio">Energy distance alongside the ratio<a class="anchor" aria-label="anchor" href="#energy-distance-alongside-the-ratio"></a>
+</h3>
+<p>Both methods also report the energy distance between groups. We build
+it from the same subject distance matrix as
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
+but square each Hellinger distance first:</p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mo>=</mo><mn>2</mn><mspace width="0.167em"></mspace><msub><mover><msup><mi>H</mi><mn>2</mn></msup><mo accent="true">¯</mo></mover><mn>12</mn></msub><mo>−</mo><msub><mover><msup><mi>H</mi><mn>2</mn></msup><mo accent="true">¯</mo></mover><mn>11</mn></msub><mo>−</mo><msub><mover><msup><mi>H</mi><mn>2</mn></msup><mo accent="true">¯</mo></mover><mn>22</mn></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
+E = 2\,\overline{H^2}_{12} - \overline{H^2}_{11} - \overline{H^2}_{22}.
+</annotation></semantics></math></p>
+<p>We average
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+over group pairs for the omnibus (<code>energyDistance</code>; Bayes
+adds <code>energyCiLow</code> and <code>energyCiHigh</code>). Squaring
+makes
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+the squared distance between the two group centroids in square-root
+composition space, less the sampling spread each centroid carries.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+measures how far apart the groups are relative to how spread out they
+are, while
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+measures the shift in mean composition itself, with no division. If
+every subject sits at its group centroid,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mo>=</mo><mn>2</mn><mo stretchy="false" form="prefix">(</mo><mn>1</mn><mo>−</mo><mrow><mi mathvariant="normal">B</mi><mi mathvariant="normal">C</mi></mrow><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">E = 2(1 - \mathrm{BC})</annotation></semantics></math>
+between the centroids, which is why the fixed <code>energyNope</code>
+above can start from a composition shift. The sample estimate leaves out
+each subject’s distance to itself, so it can dip slightly below 0 when
+groups do not differ.</p>
+<p>For a single two-group contrast with similar spread and depth in both
+groups, the two statistics usually lead to the same call. They part ways
+in a few common situations:</p>
+<ul>
+<li>
+<strong>Unequal heterogeneity.</strong> If one condition
+(e.g. disease) is more variable than control, its spread dilutes
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+even when the shift is real;
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+reports the shift directly.</li>
+<li>
+<strong>Ranking contrasts.</strong> When pairwise contrasts differ
+in within-group spread, ordering them by
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+mixes effect with noise;
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+orders them by the shift alone.</li>
+<li>
+<strong>Very homogeneous groups.</strong> When subjects within each
+group are nearly identical, a tiny shift can produce a large
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>;
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+shows that the shift is small in absolute terms.</li>
+<li>
+<strong>Different depths or studies.</strong> Count noise at low
+depth adds to between- and within-group distances alike, which pulls
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+toward 1. With squared distances that noise cancels from
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+in expectation, although Jeffreys softening still shrinks both
+statistics at shallow depth. In the sampling-depth simulation,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+keeps about half its noise-free value at 25 to 50 reads per subject,
+while the excess of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+over 1 keeps about a third, so
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+compares more fairly across cohorts, batches, and studies.</li>
+</ul>
+<p>The trade runs the other way when groups differ in spread but not in
+mean composition:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+and its tests respond strongly, while
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+moves only slightly. The p-values and <code>PPGT1</code> stay on
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>;
+under Bayes, <code>E_PPGTnope</code> gives
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+its own NOPE, and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+keeps its fold-change reading. The companion vignette, <em>Sampling
+depth, NOPE, and energy distance</em>, runs a simulation study of each
+situation above.</p>
 </div>
 </div>
 <div class="section level2">
@@ -337,16 +576,16 @@ still answer formally different questions.</p>
 <h3 id="build-a-synthetic-long-counts-table">Build a synthetic long counts table<a class="anchor" aria-label="anchor" href="#build-a-synthetic-long-counts-table"></a>
 </h3>
 <p>We begin with a known enrichment structure. A synthetic long table
-carries one row per subject–category combination with columns
+carries one row per subject-category combination with columns
 <code>subjectId</code>, <code>category</code>, <code>group</code>, and
-<code>n</code>, matching the package’s default long-table schema.
-Subjects are drawn from a multinomial allocation within each group so
-that, before enrichment is imposed, Control, Condition1, and Condition2
-are approximately exchangeable. We then multiply counts in
+<code>n</code>, matching the package’s default long-table schema. We
+draw subjects from a multinomial allocation within each group, so
+Control, Condition1, and Condition2 are approximately exchangeable
+before we impose any enrichment. We then multiply counts in
 <code>Condition1</code> for <code>Category0</code> by a fixed factor,
-introducing a modest, known enrichment in that group alone. Condition2
-is left unmodified, so its compositions remain exchangeable with Control
-under the generating process.</p>
+introducing a modest, known enrichment in that group alone. We leave
+Condition2 unmodified, so its compositions remain exchangeable with
+Control under the generating process.</p>
 <p>The internal functions <code><a href="../reference/build_synthetic_long_table.html">build_synthetic_long_table()</a></code> and
 <code><a href="../reference/plant_group_structure.html">plant_group_structure()</a></code> live in the package namespace for
 vignette and test use; they are not exported, but they provide a
@@ -381,25 +620,24 @@ reproducible procedure for simulating compositional cohorts.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Condition1 Condition2    Control </span></span>
 <span><span class="co">#&gt;          6          6          6</span></span></code></pre></div>
-<p>Inspecting the head of the table confirms the long format: each
-subject contributes
+<p>The head of the table confirms the long format: each subject
+contributes
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>
 rows (one per category), and the imposed enrichment appears as larger
 <code>n</code> in <code>Condition1</code> for <code>Category0</code>
-only. The subject–group table should show six subjects in each of the
+only. The subject-group table should show six subjects in each of the
 three groups.</p>
 </div>
 <div class="section level3">
 <h3 id="extract-compositions-and-run-permutation-inference">Extract compositions and run permutation inference<a class="anchor" aria-label="anchor" href="#extract-compositions-and-run-permutation-inference"></a>
 </h3>
-<p>The long table is aggregated to a <code>CategoryComposition</code>
-object: a subjects-by-categories count matrix with a named group factor.
-<code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> performs that coercion and
-records provenance; missing subject–category combinations are
-zero-filled.</p>
+<p><code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> aggregates the long table to
+a <code>CategoryComposition</code> object, a subjects-by-categories
+count matrix with a named group factor. It records provenance and
+zero-fills missing subject-category combinations.</p>
 <p><code><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions()</a></code> accepts either a
 <code>CategoryComposition</code> or a long table directly. Here we
-extract explicitly so the subject-scale object is visible before
+extract first so you can inspect the subject-scale object before
 inference.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">composition</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition</a></span><span class="op">(</span><span class="va">long_table</span><span class="op">)</span></span>
@@ -415,44 +653,48 @@ inference.</p>
 <span></span>
 <span><span class="va">perm_result</span></span>
 <span><span class="co">#&gt; HellingerEnrichmentResult (permutation): omnibus effectSize=2.0873, pValue=0.0020</span></span>
+<span><span class="co">#&gt;   omnibus energyDistance=0.0746 (squared Hellinger units)</span></span>
 <span><span class="co">#&gt;   3 contrast(s) tested</span></span>
 <span><span class="va">perm_result</span><span class="op">$</span><span class="va">omnibus</span></span>
 <span><span class="co">#&gt; $effectSize</span></span>
 <span><span class="co">#&gt; [1] 2.087283</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $energyDistance</span></span>
+<span><span class="co">#&gt; [1] 0.07462467</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $pValue</span></span>
 <span><span class="co">#&gt; [1] 0.001996008</span></span>
 <span><span class="va">perm_result</span><span class="op">$</span><span class="va">contrasts</span></span>
-<span><span class="co">#&gt;                 contrastId effectSize      pValue       pAdj</span></span>
-<span><span class="co">#&gt; 2 Condition1_vs_Condition2   2.652343 0.003992016 0.01197605</span></span>
-<span><span class="co">#&gt; 3    Condition1_vs_Control   2.510626 0.003992016 0.01197605</span></span>
-<span><span class="co">#&gt; 4    Condition2_vs_Control   1.002185 0.375249501 0.37524950</span></span></code></pre></div>
+<span><span class="co">#&gt;                 contrastId effectSize energyDistance      pValue       pAdj</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2   2.652343   1.213565e-01 0.003992016 0.01197605</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control   2.510626   1.024621e-01 0.003992016 0.01197605</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control   1.002185   5.539422e-05 0.375249501 0.37524950</span></span></code></pre></div>
 <p>The printed <code>HellingerEnrichmentResult</code> summarizes the
 omnibus ratio and p-value. <code>perm_result$omnibus</code> holds the
 global effect size and unadjusted p-value;
 <code>perm_result$contrasts</code> holds all three pairwise contrasts
 with Holm-adjusted <code>pAdj</code> columns, listed in the order the
-group-level pairs are generated: Condition1_vs_Condition2,
+package generates group-level pairs: Condition1_vs_Condition2,
 Condition1_vs_Control, Condition2_vs_Control. The imposed enrichment
-shows up clearly at the omnibus level (effect size 2.09, p = 0.002) and
-in both <code>Condition1</code> contrasts, for example
+shows up at the omnibus level (effect size 2.09, p = 0.002) and in both
+<code>Condition1</code> contrasts, for example
 <code>Condition1_vs_Control</code> (R = 2.51, pAdj = 0.012).
 <code>Condition2_vs_Control</code>, the arm we never modified, sits at R
-= 1.00 with pAdj = 0.38, consistent with exchangeability, exactly as
-expected for a group whose composition was never altered.</p>
+= 1.00 with pAdj = 0.38, consistent with exchangeability for a group
+whose composition we never altered.</p>
 </div>
 <div class="section level3">
 <h3 id="custom-contrasts-and-optional-collapse">Custom contrasts (and optional collapse)<a class="anchor" aria-label="anchor" href="#custom-contrasts-and-optional-collapse"></a>
 </h3>
-<p>Default output already includes all pairwise contrasts. Custom
-entries in <code>contrasts=</code> add named specifications on top of
-that default set: a length-2 character vector selects a subset pairwise
-comparison, while a list with <code>groups</code> and/or
-<code>collapse</code> remaps or restricts group levels before distances
-are computed. With three groups, a natural custom specification names
-the two scientifically primary comparisons—enriched versus Control, and
-the unmodified group versus Control—under stable identifiers for
-downstream tables.</p>
+<p>Default output includes every pairwise contrast. Passing
+<code>contrasts</code> replaces that pairwise set with the comparisons
+you named; the omnibus test still runs. Holm adjustment on permutation
+<code>pAdj</code> then applies only to those rows. A length-2 character
+vector is enough for one pair (<code>c("Control", "Condition1")</code>).
+A named list helps when you want stable identifiers, or when a
+comparison is a collapse instead of a subset. With three groups, a
+natural planned family names the two primary comparisons: enriched
+versus Control, and the unmodified group versus Control.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">perm_custom</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions</a></span><span class="op">(</span></span>
 <span>  <span class="va">composition</span>,</span>
@@ -466,17 +708,16 @@ downstream tables.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">perm_custom</span><span class="op">$</span><span class="va">contrasts</span></span>
-<span><span class="co">#&gt;                 contrastId effectSize      pValue       pAdj</span></span>
-<span><span class="co">#&gt; 2 Condition1_vs_Condition2   2.652343 0.003992016 0.01596806</span></span>
-<span><span class="co">#&gt; 3    Condition1_vs_Control   2.510626 0.003992016 0.01596806</span></span>
-<span><span class="co">#&gt; 4    Condition2_vs_Control   1.002185 0.375249501 0.75049900</span></span>
-<span><span class="co">#&gt; 5    condition1_vs_control   2.510626 0.001996008 0.00998004</span></span>
-<span><span class="co">#&gt; 6    condition2_vs_control   1.002185 0.395209581 0.75049900</span></span></code></pre></div>
-<p>The named contrasts reproduce those pairwise comparisons under
-user-chosen identifiers—useful when contrast tables are merged across
-analyses. Collapse becomes essential when experimental groups are
-relabeled for analysis (for example, merging dose cohorts into a single
-treated group) without rebuilding the count matrix by hand; see
+<span><span class="co">#&gt;              contrastId effectSize energyDistance      pValue        pAdj</span></span>
+<span><span class="co">#&gt; 2 condition1_vs_control   2.510626   1.024621e-01 0.003992016 0.007984032</span></span>
+<span><span class="co">#&gt; 3 condition2_vs_control   1.002185   5.539422e-05 0.385229541 0.385229541</span></span></code></pre></div>
+<p><code>perm_custom$contrasts</code> contains those two rows instead of
+all three pairwises, so the unused <code>Condition1_vs_Condition2</code>
+comparison does not consume a Holm penalty. Set
+<code>includePairwise = TRUE</code> if you need the old overlay (named
+specs plus every pairwise). Collapse becomes essential when you relabel
+experimental groups for analysis (for example, merging dose cohorts into
+a single treated group) without rebuilding the count matrix by hand; see
 <code><a href="../reference/CompareGroupCompositions.html">?CompareGroupCompositions</a></code> for the <code>collapse</code>
 argument.</p>
 </div>
@@ -497,69 +738,178 @@ should raise it so posterior means and intervals stabilize.</p>
 <span></span>
 <span><span class="va">bayes_result</span><span class="op">$</span><span class="va">omnibus</span></span>
 <span><span class="co">#&gt; $effectSize</span></span>
-<span><span class="co">#&gt; [1] 1.713524</span></span>
+<span><span class="co">#&gt; [1] 1.63687</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $PPGT1</span></span>
 <span><span class="co">#&gt; [1] 1</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $R_PPGTnope</span></span>
+<span><span class="co">#&gt; [1] 1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $R_nopeHigh</span></span>
+<span><span class="co">#&gt; [1] 1.132811</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $E_PPGTnope</span></span>
+<span><span class="co">#&gt; [1] 1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $E_nopeHigh</span></span>
+<span><span class="co">#&gt; [1] 0.02083857</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $enoughShufflesForNope</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $effectCiLow</span></span>
-<span><span class="co">#&gt; [1] 1.562867</span></span>
+<span><span class="co">#&gt; [1] 1.485177</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $effectCiHigh</span></span>
-<span><span class="co">#&gt; [1] 1.904499</span></span>
+<span><span class="co">#&gt; [1] 1.768305</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $energyDistance</span></span>
+<span><span class="co">#&gt; [1] 0.07099183</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $energyCiLow</span></span>
+<span><span class="co">#&gt; [1] 0.05426503</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $energyCiHigh</span></span>
+<span><span class="co">#&gt; [1] 0.08177732</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $draws</span></span>
+<span><span class="co">#&gt;  [1] 1.708383 1.512447 1.629517 1.653181 1.612448 1.739634 1.768305 1.746784</span></span>
+<span><span class="co">#&gt;  [9] 1.699903 1.667526 1.766796 1.554594 1.616840 1.567226 1.592179 1.485177</span></span>
+<span><span class="co">#&gt; [17] 1.445179 1.719701 1.667845 1.583727</span></span>
 <span><span class="va">bayes_result</span><span class="op">$</span><span class="va">contrasts</span></span>
-<span><span class="co">#&gt;                 contrastId effectSize PPGT1 effectCiLow effectCiHigh</span></span>
-<span><span class="co">#&gt; 2 Condition1_vs_Condition2  2.1210626   1.0   1.7696895     2.521843</span></span>
-<span><span class="co">#&gt; 3    Condition1_vs_Control  1.9727319   1.0   1.6681298     2.332215</span></span>
-<span><span class="co">#&gt; 4    Condition2_vs_Control  0.9799171   0.3   0.9089024     1.048363</span></span></code></pre></div>
-<p>Reading the Bayes output requires one adjustment:
-<code>bayes_result$omnibus$effectSize</code> is the posterior mean of
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>,
-not the single observed ratio at the softened point estimate. The
-interval <code>effectCiLow</code>–<code>effectCiHigh</code> communicates
-whether
+<span><span class="co">#&gt;                 contrastId effectSize PPGT1 R_PPGTnope R_nopeHigh E_PPGTnope</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2  2.1807057  1.00       1.00   1.271343       1.00</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control  2.0138347  1.00       1.00   1.250679       1.00</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control  0.9866097  0.25       0.05   1.142103       0.05</span></span>
+<span><span class="co">#&gt;    E_nopeHigh enoughShufflesForNope effectCiLow effectCiHigh energyDistance</span></span>
+<span><span class="co">#&gt; 2 0.041741391                  TRUE   1.9125217     2.461328   0.1263427672</span></span>
+<span><span class="co">#&gt; 3 0.036404736                  TRUE   1.7372538     2.263975   0.1075147607</span></span>
+<span><span class="co">#&gt; 4 0.007847746                  TRUE   0.9101125     1.058920  -0.0009219148</span></span>
+<span><span class="co">#&gt;    energyCiLow energyCiHigh</span></span>
+<span><span class="co">#&gt; 2  0.095355843   0.14684666</span></span>
+<span><span class="co">#&gt; 3  0.081307826   0.13075750</span></span>
+<span><span class="co">#&gt; 4 -0.007514817   0.00312827</span></span></code></pre></div>
+<p><code>bayes_result$omnibus$effectSize</code> is the posterior mean of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+over the Dirichlet draws; the permutation result reports
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+at the softened point estimate. The interval <code>effectCiLow</code> to
+<code>effectCiHigh</code> is a 95% HPDI by default and shows whether
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>&gt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R &gt; 1</annotation></semantics></math>
-remains stable under composition uncertainty. When the credible interval
-excludes 1, enrichment is supported and <code>PPGT1</code> is typically
-near 1. When the interval spans 1 but permutation p-values are small,
-sparse counts may be driving a fixed-composition signal that the
-Bayesian procedure correctly weakens.</p>
+holds up under composition uncertainty. When the interval excludes 1,
+<code>PPGT1</code> is typically near 1; the interval width and
+<code>bayes_result$omnibus$draws</code> show whether that exclusion is a
+hair above 1 or a large enrichment. When the interval spans 1 but
+permutation p-values are small, sparse counts may be driving a
+fixed-composition signal that the Bayesian procedure weakens.
+<code>R_PPGTnope</code> sharpens the first case: it asks whether
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+clears the edge that label shuffling routinely produces, so a posterior
+that sits a hair above 1 no longer reads as enrichment.</p>
+<p>To set the edges yourself, pass a number above 1 as <code>nope</code>
+and a number above 0 as <code>energyNope</code>. Here
+<code><a href="../reference/ComputeEnergyNopeBound.html">ComputeEnergyNopeBound()</a></code> translates a 5-point composition
+shift on five even categories into an
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+bound:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">reference_composition</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">5</span><span class="op">)</span></span>
+<span><span class="va">shifted_composition</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.15</span>, <span class="fl">0.25</span>, <span class="fl">0.2</span>, <span class="fl">0.2</span>, <span class="fl">0.2</span><span class="op">)</span></span>
+<span><span class="va">energy_edge</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/ComputeEnergyNopeBound.html">ComputeEnergyNopeBound</a></span><span class="op">(</span><span class="va">reference_composition</span>, <span class="va">shifted_composition</span><span class="op">)</span></span>
+<span><span class="va">energy_edge</span></span>
+<span><span class="co">#&gt; [1] 0.006376243</span></span>
+<span></span>
+<span><span class="va">fixed_nope_result</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/CompareGroupCompositions.html">CompareGroupCompositions</a></span><span class="op">(</span></span>
+<span>  <span class="va">composition</span>,</span>
+<span>  method <span class="op">=</span> <span class="st">"bayes"</span>,</span>
+<span>  nPosterior <span class="op">=</span> <span class="fl">20</span>,</span>
+<span>  nope <span class="op">=</span> <span class="fl">1.2</span>,</span>
+<span>  energyNope <span class="op">=</span> <span class="va">energy_edge</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">42</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">fixed_nope_result</span><span class="op">$</span><span class="va">contrasts</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"contrastId"</span>, <span class="st">"PPGT1"</span>, <span class="st">"R_PPGTnope"</span>, <span class="st">"R_nopeHigh"</span>, <span class="st">"E_PPGTnope"</span>, <span class="st">"E_nopeHigh"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="co">#&gt;                 contrastId PPGT1 R_PPGTnope R_nopeHigh E_PPGTnope  E_nopeHigh</span></span>
+<span><span class="co">#&gt; 2 Condition1_vs_Condition2   1.0          1        1.2          1 0.006376243</span></span>
+<span><span class="co">#&gt; 3    Condition1_vs_Control   1.0          1        1.2          1 0.006376243</span></span>
+<span><span class="co">#&gt; 4    Condition2_vs_Control   0.3          0        1.2          0 0.006376243</span></span></code></pre></div>
+<p>Every contrast now shares the edges
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>=</mo><mn>1.2</mn></mrow><annotation encoding="application/x-tex">R = 1.2</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+= 0.0064. <code>PPGT1</code> differs slightly from
+<code>bayes_result</code> despite the same seed, because only the NOPE
+run consumed extra random numbers for its shuffles. Translating a
+meaningful shift into a ratio needs a simulation at your own depths and
+group sizes, because
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+also depends on within-group spread; the companion sampling-depth
+vignette shows how that spread moves
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
 </div>
 <div class="section level3">
 <h3 id="plot-contrasts">Plot contrasts<a class="anchor" aria-label="anchor" href="#plot-contrasts"></a>
 </h3>
-<p><code><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts()</a></code> visualizes contrast-level
-effect sizes. A dotted vertical line at
+<p><code><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts()</a></code> stacks two panels that share
+the contrast rows:
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+on top and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+below, each read left to right on its own axis. A dotted vertical line
+marks each statistic’s no-difference value,
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>R</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R = 1</annotation></semantics></math>
-marks the exchangeability reference under this metric. When
-<code>showOmnibus = TRUE</code> (default), the omnibus posterior-mean or
-observed ratio appears as a dashed reference with its p-value
-(permutation) or <code>PPGT1</code> (Bayes) annotated—contrasts can then
-be read against both unity and the global summary.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>E</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">E = 0</annotation></semantics></math>.
+When <code>showOmnibus = TRUE</code> (default), a dashed line in each
+panel marks the omnibus value; the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+panel labels it with the p-value (permutation) or <code>PPGT1</code> and
+<code>R_PPGTnope</code> (Bayes), and the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+panel labels it with
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+and, under Bayes, <code>E_PPGTnope</code>. Set
+<code>showEnergyDistance = FALSE</code> for the ratio panel alone.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts</a></span><span class="op">(</span><span class="va">perm_result</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="hellinger-enrichment_files/figure-html/plot-perm-1.png" class="r-plt" alt="Permutation contrast panel with omnibus reference." width="672"><p class="caption">
-Permutation contrast panel with omnibus reference.
+<img src="hellinger-enrichment_files/figure-html/plot-perm-1.png" class="r-plt" alt="Permutation contrasts on R (top) and E (bottom) with omnibus references." width="672"><p class="caption">
+Permutation contrasts on R (top) and E (bottom) with omnibus references.
 </p>
 </div>
-<p>For permutation results, points are colored by whether Holm-adjusted
-<code>pAdj &lt; 0.05</code>. For Bayes results, half-eye plots show the
-posterior density of each contrast’s
+<p>For permutation results, the plot colors points by whether
+Holm-adjusted <code>pAdj &lt; 0.05</code>. For Bayes results, half-eye
+plots show the posterior density of each contrast’s
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
-with nested intervals.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>
+with nested intervals, and a gray band behind each half-eye spans that
+statistic’s NOPE, permutation-calibrated or fixed: from 1 to
+<code>R_nopeHigh</code> in the top panel and from 0 to
+<code>E_nopeHigh</code> in the bottom panel. The legend names each band:
+“NOPE (permutation)” for the default, where the band shows the median of
+the per-draw edges, or “NOPE (fixed)”, in a darker gray, for a bound you
+supplied. The share of each slab right of its band approximates that
+statistic’s NOPE probability; it matches exactly for a fixed edge, while
+the NOPE compares each draw with its own edge.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/PlotCompositionContrasts.html">PlotCompositionContrasts</a></span><span class="op">(</span><span class="va">bayes_result</span><span class="op">)</span></span></code></pre></div>
 <div class="figure">
-<img src="hellinger-enrichment_files/figure-html/plot-bayes-1.png" class="r-plt" alt="Bayesian half-eye posterior densities for pairwise contrasts." width="672"><p class="caption">
-Bayesian half-eye posterior densities for pairwise contrasts.
+<img src="hellinger-enrichment_files/figure-html/plot-bayes-1.png" class="r-plt" alt="Bayesian half-eye posterior densities of R (top) and E (bottom), each with its NOPE band, for pairwise contrasts." width="672"><p class="caption">
+Bayesian half-eye posterior densities of R (top) and E (bottom), each
+with its NOPE band, for pairwise contrasts.
 </p>
 </div>
-<p>The two panels display the same ratio scale, each with
-method-appropriate uncertainty. Permutation emphasizes discrete
-significance against the label null; Bayes overlays composition
-uncertainty via half-eye densities of
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
+<p>The two figures share the same scales, each with uncertainty suited
+to its method. Permutation marks discrete significance against the label
+null; Bayes shows composition uncertainty as half-eye densities of
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>.
+Reading the panels together separates the size of a shift
+(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>E</mi><annotation encoding="application/x-tex">E</annotation></semantics></math>)
+from how far it stands out against within-group spread
+(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>).</p>
 </div>
 <div class="section level3">
 <h3 id="closing-interpretation">Closing interpretation<a class="anchor" aria-label="anchor" href="#closing-interpretation"></a>
@@ -568,39 +918,45 @@ uncertainty via half-eye densities of
 <code>Condition1</code> enrichment in <code>Category0</code>: the
 omnibus ratio and both <code>Condition1</code> contrasts sit well above
 1, with permutation p-values and Bayesian intervals agreeing that the
-shift is real rather than label noise.
-<code>Condition2_vs_Control</code> behaves as expected for a group that
-was never modified, and the two methods agree on it: permutation returns
-R = 1.00 with pAdj = 0.38, and the Bayesian interval spans 1 (0.91–1.05)
-with PPGT1 = 0.30. A significant omnibus result therefore does not imply
-that every pairwise group differs from Control.</p>
-<p>This result does not generalize to all real cohorts. Sparse
-categories, unequal cell yields, or violated exchangeability (for
-example, batch confounded with group) can produce ratios that look
-enriched under fixed compositions but fail to hold once Dirichlet
-uncertainty is propagated. In those settings, the Bayesian approach is
-the more conservative assessment of whether an apparent contrast
-survives sampling variation in the compositions themselves. It is also
-worth remembering that permutation targets a fixed
+shift is real. <code>Condition2_vs_Control</code> behaves as expected
+for a group that we never modified, and the two methods agree on it:
+permutation returns R = 1.00 with pAdj = 0.38, and the Bayesian interval
+spans 1 (0.91 to 1.06) with PPGT1 = 0.25, R_PPGTnope = 0.05, and
+E_PPGTnope = 0.05. A significant omnibus result therefore does not imply
+that every pairwise group differs from Control. The energy distance
+gives the same reading in absolute units:
+<code>Condition1_vs_Control</code> separates by E = 0.1 squared
+Hellinger units, while <code>Condition2_vs_Control</code> sits at E =
+0.000055.</p>
+<p>These results come from one synthetic cohort, and Bayes can sit on
+either side of permutation. Sparse categories, unequal cell yields, or
+violated exchangeability (for example, batch confounded with group) can
+produce ratios that look enriched under fixed compositions but fail to
+hold once we propagate Dirichlet uncertainty; there, Bayes can weaken a
+permutation signal. Dense counts with
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>
+just above 1 produce the opposite disagreement: <code>PPGT1</code> can
+sit near 1 while the HPDI barely excludes 1, and permutation still
+reports a large p-value because labels remain compatible with
+exchangeability. <code>R_PPGTnope</code> targets this case: it stays low
+when the excess over 1 is no larger than what label shuffling produces.
+Permutation also targets a fixed
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>:
-a truly exchangeable group will cross a p &lt; 0.05 threshold by chance
-alone roughly one draw in twenty, so an isolated marginal p-value from a
-single permutation run is not, on its own, strong evidence against
-exchangeability—propagating composition uncertainty through the Bayesian
-option is one way to check whether such a signal is more than sampling
-noise.</p>
-<p>Two practical constraints bound any analysis. First, each group must
-include at least two subjects, because within-group distances are
-defined from pairwise comparisons. Second, each subject must map to
-exactly one experimental group in the metadata; conflicting group labels
-for the same subject are rejected at composition build time. Within
-those constraints, the workflow—long counts, subject composition,
-contrast specification, ratio-based inference, and contrast
-plotting—extends from this synthetic example to real
-<code><a href="../reference/ExtractClusterComposition.html">ExtractClusterComposition()</a></code> inputs without changing the
-inferential definition of
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math>.</p>
+an exchangeable group will cross a p &lt; 0.05 threshold by chance alone
+roughly one run in twenty, so an isolated marginal p-value from a single
+permutation run is weak evidence against exchangeability. The interval
+and the draws are how you judge closeness to 1; <code>PPGT1</code> alone
+does not encode effect magnitude.</p>
 </div>
+</div>
+<div class="section level2">
+<h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
+</h2>
+<p>Kruschke, J. K. (2018). Rejecting or accepting parameter values in
+Bayesian estimation. <em>Advances in Methods and Practices in
+Psychological Science</em>, 1(2), 270-280. <a href="https://doi.org/10.1177/2515245918771304" class="external-link uri">https://doi.org/10.1177/2515245918771304</a>. <a href="https://www.psychologicalscience.org/journals/ampps/2515245918771304/" class="external-link">Article
+page (APS)</a>; <a href="https://scholarworks.iu.edu/dspace/items/bada026d-fe1b-4f53-ad5b-db6e8bf99711" class="external-link">open-access
+record (IU ScholarWorks)</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="acknowledgments">Acknowledgments<a class="anchor" aria-label="anchor" href="#acknowledgments"></a>

@@ -21,4 +21,4 @@ compute_hellinger_distance_freqs(freqs1, freqs2)
 
 ## Value
 
-Scalar Hellinger distance in \eqn\[0, 1\].
+Scalar Hellinger distance in \\\[0, 1\]\\.

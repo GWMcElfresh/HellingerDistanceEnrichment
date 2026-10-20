@@ -34,6 +34,7 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/hellinger-enrichment.html">Hellinger enrichment for subject-level compositions</a></li>
+    <li><a class="dropdown-item" href="../articles/sampling-depth.html">Sampling depth, NOPE, and energy distance</a></li>
     <li><a class="dropdown-item" href="../articles/extract-metadata.html">Extracting compositions from Seurat and anndata</a></li>
   </ul>
 </li>
@@ -60,7 +61,7 @@
                         <h4 data-toc-skip class="author">GW
 McElfresh</h4>
             
-            <h4 data-toc-skip class="date">2026-09-28</h4>
+            <h4 data-toc-skip class="date">2026-10-20</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/GWMcElfresh/HellingerDistanceEnrichment/blob/HEAD/vignettes/extract-metadata.Rmd" class="external-link"><code>vignettes/extract-metadata.Rmd</code></a></small>
       <div class="d-none name"><code>extract-metadata.Rmd</code></div>
@@ -214,6 +215,9 @@ workflow described in the companion vignette.</p>
 <span><span class="co">#&gt; $effectSize</span></span>
 <span><span class="co">#&gt; [1] 0.9485571</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $energyDistance</span></span>
+<span><span class="co">#&gt; [1] -0.004025749</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $pValue</span></span>
 <span><span class="co">#&gt; [1] 0.4705882</span></span></code></pre></div>
 </div>
@@ -268,6 +272,9 @@ in-memory construction: the CRAN wrapper still passes
 <span><span class="co">#&gt; $effectSize</span></span>
 <span><span class="co">#&gt; [1] 1</span></span>
 <span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $energyDistance</span></span>
+<span><span class="co">#&gt; [1] 0</span></span>
+<span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $pValue</span></span>
 <span><span class="co">#&gt; [1] 1</span></span></code></pre></div>
 </div>
@@ -309,6 +316,9 @@ the other side is unchanged.</p>
 <span><span class="op">)</span><span class="op">$</span><span class="va">omnibus</span></span>
 <span><span class="co">#&gt; $effectSize</span></span>
 <span><span class="co">#&gt; [1] 4.096028</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $energyDistance</span></span>
+<span><span class="co">#&gt; [1] 0.09418413</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $pValue</span></span>
 <span><span class="co">#&gt; [1] 0.3529412</span></span></code></pre></div>

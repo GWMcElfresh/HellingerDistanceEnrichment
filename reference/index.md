@@ -6,6 +6,8 @@
   : Build a CategoryComposition object from validated components.
 - [`CompareGroupCompositions()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/CompareGroupCompositions.md)
   : Compare categorical compositions across groups.
+- [`ComputeEnergyNopeBound()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ComputeEnergyNopeBound.md)
+  : Energy distance NOPE bound for a composition shift.
 - [`ExtractClusterComposition()`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/ExtractClusterComposition.md)
   : Extract subject-by-category counts from cell-level metadata.
 - [`HellingerDistanceEnrichment`](https://gwmcelfresh.github.io/HellingerDistanceEnrichment/reference/HellingerDistanceEnrichment.md)

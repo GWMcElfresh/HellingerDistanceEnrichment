@@ -99,12 +99,51 @@ collapse/subset contrasts. This package implements that procedure.
   matrix; p-value includes the observed ratio (workbook style).
 - **Bayes:** draw subject compositions from a conjugate Dirichlet
   posterior; report the posterior probability that (R \> 1) (abbreviated
-  `PPGT1`) and effect-size credible intervals.
+  `PPGT1`) and a 95% highest posterior density interval on (R)
+  (`credibleInterval = "cpi"` restores equal-tailed quantiles). By
+  default (`nope = "shuffle"`), each draw also shuffles group labels to
+  set a Null-Oriented Permutation Equivalence (NOPE) interval, a
+  permutation-calibrated null reference interval for conditional
+  effects, on (R) and, with `energyNope = "shuffle"`, on the energy
+  distance (E). The goal parallels a permutation test, but NOPE reports
+  a region instead of a p-value. `R_PPGTnope` and `E_PPGTnope` are the
+  posterior probabilities that each statistic clears its upper edge
+  (`R_nopeHigh`, `E_nopeHigh`). Unlike Kruschke’s ROPE ([Kruschke,
+  2018](https://www.psychologicalscience.org/journals/ampps/2515245918771304/);
+  [open-access
+  record](https://scholarworks.iu.edu/dspace/items/bada026d-fe1b-4f53-ad5b-db6e8bf99711)),
+  which the analyst fixes in advance from domain knowledge, the NOPE
+  takes its edge from label shuffles, because few people have intuition
+  for a Hellinger ratio; pass `nope = <number above 1>` or
+  `energyNope = <number above 0>` when you know the smallest effect that
+  matters. For (E), `ComputeEnergyNopeBound(reference, shifted)` turns a
+  composition shift into that bound. With deep counts, `PPGT1` can
+  exceed 0.95 for groups that do not differ, so read the NOPE
+  probabilities first. A threshold of 0.95 on them is conservative and
+  loses power at shallow depth, while 0.5 behaves more like the
+  permutation test; the sampling-depth vignette measures both. Groups
+  smaller than about 4 versus 4 have too few distinct label shuffles for
+  the NOPE, and both NOPE probabilities are then `NA` with a warning and
+  `enoughShufflesForNope = FALSE`. Omnibus posterior draws are in
+  `result$omnibus$draws`.
 
 Effect size is the mean between-group pairwise Hellinger distance
-divided by the mean within-group pairwise distance. Permutation contrast
-p-values are Holm-adjusted by default; the omnibus statistic is
-unadjusted. Bayes reports `PPGT1`.
+divided by the mean within-group pairwise distance. Both methods also
+report the energy distance between groups (`energyDistance`: twice the
+mean between-group squared distance minus each group’s mean within-group
+squared distance). Squaring makes (E) the squared distance between group
+centroids in square-root composition space, so it measures the shift in
+mean composition without dividing by within-group spread. Count noise
+cancels from (E) in expectation, so it shrinks less than (R) at shallow
+depth and compares more fairly across contrasts and studies; see the
+sampling-depth vignette for a simulation study. Bayes adds a posterior
+interval on (E). Omit `contrasts` to test every pairwise comparison;
+pass `contrasts` (a length-2 vector or a list of specs) to test only
+that planned family. The package Holm-adjusts permutation contrast
+p-values across the contrast rows that ran; the omnibus statistic is
+unadjusted. Bayes reports `PPGT1`, plus `R_PPGTnope` with `R_nopeHigh`
+unless `nope = "none"` and `E_PPGTnope` with `E_nopeHigh` unless
+`energyNope = "none"`.
 
 ## Acknowledgments
 

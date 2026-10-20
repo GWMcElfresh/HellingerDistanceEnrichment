@@ -145,6 +145,9 @@ if (requireNamespace("Seurat", quietly = TRUE)) {
 #> $effectSize
 #> [1] 0.9485571
 #> 
+#> $energyDistance
+#> [1] -0.004025749
+#> 
 #> $pValue
 #> [1] 0.4705882
 ```
@@ -201,6 +204,9 @@ if (inherits(adata, "try-error")) {
 #> $effectSize
 #> [1] 1
 #> 
+#> $energyDistance
+#> [1] 0
+#> 
 #> $pValue
 #> [1] 1
 ```
@@ -245,6 +251,9 @@ CompareGroupCompositions(
 )$omnibus
 #> $effectSize
 #> [1] 4.096028
+#> 
+#> $energyDistance
+#> [1] 0.09418413
 #> 
 #> $pValue
 #> [1] 0.3529412
