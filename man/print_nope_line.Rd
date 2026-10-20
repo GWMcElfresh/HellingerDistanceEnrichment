@@ -25,7 +25,8 @@ result carries no NOPE or fixed edge on that statistic.}
 
 \item{no_difference_value}{Lower edge of the interval (1 for R, 0 for E).}
 
-\item{omnibus}{The result's omnibus list, for \code{enoughShufflesForNope}.}
+\item{omnibus}{The result's omnibus list, for \code{enoughShufflesForNope} and
+\code{R_hdiAboveNope} or \code{E_hdiAboveNope}.}
 }
 \value{
 \code{NULL}, invisibly; called for its printed line.

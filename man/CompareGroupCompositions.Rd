@@ -60,15 +60,15 @@ even when \code{contrasts} is supplied (the old additive overlay).}
 permutation-calibrated null reference interval whose upper bound comes from label
 shuffles within each posterior draw. A single number above 1 sets a fixed
 NOPE bound on \eqn{R} that you choose in advance.
-Either adds \code{R_PPGTnope} and \code{R_nopeHigh} to the output. \code{"none"} drops
-them. Ignored for permutation.}
+Either adds \code{R_PPGTnope}, \code{R_nopeHigh}, and \code{R_hdiAboveNope} to the output.
+\code{"none"} drops them. Ignored for permutation.}
 
 \item{energyNope}{Bayes NOPE interval on the energy distance \eqn{E}, in
 squared Hellinger units. \code{"shuffle"} (default) sets a NOPE interval from
 the same label shuffles as \code{nope}. A single number above 0 sets a fixed
 NOPE bound on \eqn{E}; \code{\link[=ComputeEnergyNopeBound]{ComputeEnergyNopeBound()}} turns a composition shift
-into one. Either adds \code{E_PPGTnope} and
-\code{E_nopeHigh} to the output. \code{"none"} drops them. Ignored for permutation.}
+into one. Either adds \code{E_PPGTnope}, \code{E_nopeHigh}, and \code{E_hdiAboveNope} to
+the output. \code{"none"} drops them. Ignored for permutation.}
 
 \item{nNopeShuffles}{Label shuffles per posterior draw used to set the
 NOPEs (default 200). Each shuffle builds one group summary per
@@ -82,15 +82,16 @@ when \code{method = "bayes"} and \code{nope} or
 \value{
 A HellingerEnrichmentResult with omnibus summary, contrast table, and
 (Bayes only) long-format posterior \code{draws} including the omnibus draws.
-Bayes summaries carry \code{R_PPGTnope} and \code{R_nopeHigh} unless
-\code{nope = "none"}, \code{E_PPGTnope} and \code{E_nopeHigh} unless
+Bayes summaries carry \code{R_PPGTnope}, \code{R_nopeHigh}, and \code{R_hdiAboveNope} unless
+\code{nope = "none"}, \code{E_PPGTnope}, \code{E_nopeHigh}, and \code{E_hdiAboveNope} unless
 \code{energyNope = "none"} (each edge column is the median across draws of the
-per-draw upper edge), and \code{enoughShufflesForNope} when \code{nope} or \code{energyNope} is
-\code{"shuffle"} (\code{FALSE} when groups are too small for the NOPE, which is
-why the NOPE probabilities are then \code{NA}); \code{draws} carries the per-draw
-\code{R_nopeHigh} and \code{E_nopeHigh}. Both methods carry \code{energyDistance} beside
-the ratio \code{effectSize}; Bayes adds \code{energyCiLow}/\code{energyCiHigh} and
-per-draw \code{energyDistance} in \code{draws}.
+per-draw upper edge; each \verb{*_hdiAboveNope} is \code{TRUE} when the 95\% HPDI sits
+entirely above that reported edge), and \code{enoughShufflesForNope} when \code{nope}
+or \code{energyNope} is \code{"shuffle"} (\code{FALSE} when groups are too small for the
+NOPE, which is why the NOPE probabilities and HDI logicals are then \code{NA});
+\code{draws} carries the per-draw \code{R_nopeHigh} and \code{E_nopeHigh}. Both methods
+carry \code{energyDistance} beside the ratio \code{effectSize}; Bayes adds
+\code{energyCiLow}/\code{energyCiHigh} and per-draw \code{energyDistance} in \code{draws}.
 }
 \description{
 Tests whether between-group Hellinger distances exceed within-group distances
@@ -134,9 +135,11 @@ ratio of Hellinger distances or an energy distance, so NOPE takes its upper
 bound from the data: the largest value of the statistic these subjects
 routinely produce when labels carry no information. The bound also differs
 from draw to draw, and each NOPE probability counts the draws that clear
-their own bound. NOPE therefore acts as a null reference calibrated by
-permutation, closer to a permutation test than to a statement of practical
-significance. When you know the smallest effect that matters, pass it as a
+their own bound. \code{R_hdiAboveNope} and \code{E_hdiAboveNope} report Kruschke's
+comparison against the reported region: \code{TRUE} when the 95\% HPDI sits entirely
+above that statistic's NOPE (\code{effectCiLow > R_nopeHigh},
+\code{energyCiLow > E_nopeHigh}). The HPDI is the credible interval; the NOPE is
+the null region. When you know the smallest effect that matters, pass it as a
 fixed NOPE bound, which plays the role of Kruschke's preset region:
 \verb{nope = <number above 1>} on \eqn{R}, or \verb{energyNope = <number above 0>} on
 \eqn{E} in squared Hellinger units. A fixed bound needs no shuffles, so it
@@ -183,7 +186,7 @@ through that same curvature. The sample estimate excludes each subject's
 distance to itself, so it can dip slightly below 0 when groups do not
 differ. The p-values and \code{PPGT1} stay on \eqn{R}; under Bayes the package
 reports a posterior interval on \eqn{E} (\code{energyCiLow}, \code{energyCiHigh}) and,
-with \code{energyNope}, \code{E_PPGTnope}.
+with \code{energyNope}, \code{E_PPGTnope} and \code{E_hdiAboveNope}.
 }
 \references{
 Edlefsen, P. Hellinger between/within enrichment for subject-level

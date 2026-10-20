@@ -40,9 +40,11 @@
 #' bound from the data: the largest value of the statistic these subjects
 #' routinely produce when labels carry no information. The bound also differs
 #' from draw to draw, and each NOPE probability counts the draws that clear
-#' their own bound. NOPE therefore acts as a null reference calibrated by
-#' permutation, closer to a permutation test than to a statement of practical
-#' significance. When you know the smallest effect that matters, pass it as a
+#' their own bound. `R_hdiAboveNope` and `E_hdiAboveNope` report Kruschke's
+#' comparison against the reported region: `TRUE` when the 95% HPDI sits entirely
+#' above that statistic's NOPE (`effectCiLow > R_nopeHigh`,
+#' `energyCiLow > E_nopeHigh`). The HPDI is the credible interval; the NOPE is
+#' the null region. When you know the smallest effect that matters, pass it as a
 #' fixed NOPE bound, which plays the role of Kruschke's preset region:
 #' `nope = <number above 1>` on \eqn{R}, or `energyNope = <number above 0>` on
 #' \eqn{E} in squared Hellinger units. A fixed bound needs no shuffles, so it
@@ -89,7 +91,7 @@
 #' distance to itself, so it can dip slightly below 0 when groups do not
 #' differ. The p-values and `PPGT1` stay on \eqn{R}; under Bayes the package
 #' reports a posterior interval on \eqn{E} (`energyCiLow`, `energyCiHigh`) and,
-#' with `energyNope`, `E_PPGTnope`.
+#' with `energyNope`, `E_PPGTnope` and `E_hdiAboveNope`.
 #'
 #' @param x A CategoryComposition object or long counts table.
 #' @param method Inference method: `"permutation"` or `"bayes"`.
@@ -117,14 +119,14 @@
 #'   permutation-calibrated null reference interval whose upper bound comes from label
 #'   shuffles within each posterior draw. A single number above 1 sets a fixed
 #'   NOPE bound on \eqn{R} that you choose in advance.
-#'   Either adds `R_PPGTnope` and `R_nopeHigh` to the output. `"none"` drops
-#'   them. Ignored for permutation.
+#'   Either adds `R_PPGTnope`, `R_nopeHigh`, and `R_hdiAboveNope` to the output.
+#'   `"none"` drops them. Ignored for permutation.
 #' @param energyNope Bayes NOPE interval on the energy distance \eqn{E}, in
 #'   squared Hellinger units. `"shuffle"` (default) sets a NOPE interval from
 #'   the same label shuffles as `nope`. A single number above 0 sets a fixed
 #'   NOPE bound on \eqn{E}; [ComputeEnergyNopeBound()] turns a composition shift
-#'   into one. Either adds `E_PPGTnope` and
-#'   `E_nopeHigh` to the output. `"none"` drops them. Ignored for permutation.
+#'   into one. Either adds `E_PPGTnope`, `E_nopeHigh`, and `E_hdiAboveNope` to
+#'   the output. `"none"` drops them. Ignored for permutation.
 #' @param nNopeShuffles Label shuffles per posterior draw used to set the
 #'   NOPEs (default 200). Each shuffle builds one group summary per
 #'   shuffled statistic, so cost scales as `nPosterior * nNopeShuffles`
@@ -134,15 +136,16 @@
 #' @param ... Ignored.
 #' @return A HellingerEnrichmentResult with omnibus summary, contrast table, and
 #'   (Bayes only) long-format posterior `draws` including the omnibus draws.
-#'   Bayes summaries carry `R_PPGTnope` and `R_nopeHigh` unless
-#'   `nope = "none"`, `E_PPGTnope` and `E_nopeHigh` unless
+#'   Bayes summaries carry `R_PPGTnope`, `R_nopeHigh`, and `R_hdiAboveNope` unless
+#'   `nope = "none"`, `E_PPGTnope`, `E_nopeHigh`, and `E_hdiAboveNope` unless
 #'   `energyNope = "none"` (each edge column is the median across draws of the
-#'   per-draw upper edge), and `enoughShufflesForNope` when `nope` or `energyNope` is
-#'   `"shuffle"` (`FALSE` when groups are too small for the NOPE, which is
-#'   why the NOPE probabilities are then `NA`); `draws` carries the per-draw
-#'   `R_nopeHigh` and `E_nopeHigh`. Both methods carry `energyDistance` beside
-#'   the ratio `effectSize`; Bayes adds `energyCiLow`/`energyCiHigh` and
-#'   per-draw `energyDistance` in `draws`.
+#'   per-draw upper edge; each `*_hdiAboveNope` is `TRUE` when the 95% HPDI sits
+#'   entirely above that reported edge), and `enoughShufflesForNope` when `nope`
+#'   or `energyNope` is `"shuffle"` (`FALSE` when groups are too small for the
+#'   NOPE, which is why the NOPE probabilities and HDI logicals are then `NA`);
+#'   `draws` carries the per-draw `R_nopeHigh` and `E_nopeHigh`. Both methods
+#'   carry `energyDistance` beside the ratio `effectSize`; Bayes adds
+#'   `energyCiLow`/`energyCiHigh` and per-draw `energyDistance` in `draws`.
 #' @references
 #' Edlefsen, P. Hellinger between/within enrichment for subject-level
 #' categorical compositions (Jeffreys softening, ratio statistic, label
@@ -307,16 +310,20 @@ CompareGroupCompositions <- function(x,
 #' @param nope_setting `x$settings$nope` or `x$settings$energyNope`.
 #' @param statistic_label `"R"` or `"E"`.
 #' @param no_difference_value Lower edge of the interval (1 for R, 0 for E).
-#' @param omnibus The result's omnibus list, for `enoughShufflesForNope`.
+#' @param omnibus The result's omnibus list, for `enoughShufflesForNope` and
+#'   `R_hdiAboveNope` or `E_hdiAboveNope`.
 #' @return `NULL`, invisibly; called for its printed line.
 #' @keywords internal
 print_nope_line <- function(nope_probability, nope_high, nope_setting, statistic_label, no_difference_value, omnibus) {
     if (is.null(nope_probability)) {
         return(invisible(NULL))
     }
+    hdi_column <- paste0(statistic_label, "_hdiAboveNope")
+    hdi_above <- omnibus[[hdi_column]]
     if (identical(nope_setting, "shuffle") && isFALSE(omnibus$enoughShufflesForNope)) {
         cat(sprintf(
-            "  omnibus %s_PPGTnope=NA (groups too small: too few distinct label shuffles for the NOPE)\n",
+            "  omnibus %s_PPGTnope=NA, %s_hdiAboveNope=NA (groups too small: too few distinct label shuffles for the NOPE)\n",
+            statistic_label,
             statistic_label
         ))
         return(invisible(NULL))
@@ -326,14 +333,22 @@ print_nope_line <- function(nope_probability, nope_high, nope_setting, statistic
     } else {
         "fixed NOPE bound"
     }
+    hdi_text <- if (is.null(hdi_above)) {
+        ""
+    } else if (is.na(hdi_above)) {
+        sprintf("; %s_hdiAboveNope=NA", statistic_label)
+    } else {
+        sprintf("; %s_hdiAboveNope=%s", statistic_label, hdi_above)
+    }
     cat(sprintf(
-        "  omnibus %s_PPGTnope=%.4f (%s on %s: [%g, %.4g])\n",
+        "  omnibus %s_PPGTnope=%.4f (%s on %s: [%g, %.4g]%s)\n",
         statistic_label,
         nope_probability,
         nope_label,
         statistic_label,
         no_difference_value,
-        nope_high
+        nope_high,
+        hdi_text
     ))
     invisible(NULL)
 }
@@ -896,7 +911,9 @@ resolve_nope_edge <- function(nope_setting, shuffled_statistics, statistic_colum
 #'
 #' `R_PPGTnope` compares each draw's \eqn{R} with that same draw's \eqn{R} edge,
 #' and `E_PPGTnope` does the same for \eqn{E}; `R_nopeHigh` and `E_nopeHigh` in
-#' the summary are the medians of the per-draw edges. Shuffles consume the
+#' the summary are the medians of the per-draw edges. `R_hdiAboveNope` is
+#' `TRUE` when the 95% HPDI of \eqn{R} sits entirely above `R_nopeHigh`;
+#' `E_hdiAboveNope` is the same comparison for \eqn{E}. Shuffles consume the
 #' random stream between Dirichlet draws, so a fixed seed gives different draws
 #' when `nope` or `energy_nope` is `"shuffle"` than when neither is.
 #' @keywords internal
@@ -933,7 +950,7 @@ run_bayes_enrichment <- function(composition,
                 sprintf(
                     paste0(
                         "groups too small for a NOPE in %s: too few distinct label shuffles, ",
-                        "so the NOPE probabilities are NA and enoughShufflesForNope is FALSE ",
+                        "so the NOPE probabilities and HDI-above-NOPE flags are NA and enoughShufflesForNope is FALSE ",
                         "(the result still includes PPGT1); a fixed edge (nope = <number above 1>, ",
                         "energyNope = <number above 0>) works at any group size"
                     ),
@@ -951,6 +968,15 @@ run_bayes_enrichment <- function(composition,
             return(NA_real_)
         }
         mean(statistic_values > nope_highs)
+    }
+
+    # Kruschke's rule against the reported region: HPDI entirely above the
+    # median per-draw edge. NA when the shuffle NOPE itself is NA.
+    summarize_hdi_above_nope <- function(ci_low, nope_high, nope_setting, contrast_name) {
+        if (identical(nope_setting, "shuffle") && !enough_shuffles[[contrast_name]]) {
+            return(NA)
+        }
+        unname(ci_low > nope_high)
     }
 
     run_contrast_bayes <- function(contrast_name) {
@@ -1003,6 +1029,12 @@ run_bayes_enrichment <- function(composition,
             ratio_nope_highs <- vapply(draw_results, function(x) x$ratioNopeHigh, numeric(1))
             summary_cols$R_PPGTnope <- summarize_nope_probability(effect_sizes, ratio_nope_highs, nope, contrast_name)
             summary_cols$R_nopeHigh <- stats::median(ratio_nope_highs)
+            summary_cols$R_hdiAboveNope <- summarize_hdi_above_nope(
+                ci_bounds[1],
+                summary_cols$R_nopeHigh,
+                nope,
+                contrast_name
+            )
             draw_cols$R_nopeHigh <- ratio_nope_highs
         }
         if (use_energy_nope) {
@@ -1014,6 +1046,12 @@ run_bayes_enrichment <- function(composition,
                 contrast_name
             )
             summary_cols$E_nopeHigh <- stats::median(energy_nope_highs)
+            summary_cols$E_hdiAboveNope <- summarize_hdi_above_nope(
+                energy_ci_bounds[1],
+                summary_cols$E_nopeHigh,
+                energy_nope,
+                contrast_name
+            )
             draw_cols$E_nopeHigh <- energy_nope_highs
         }
         if (any_shuffle_nope) {
@@ -1054,7 +1092,11 @@ run_bayes_enrichment <- function(composition,
         effectSize = omnibus_row$effectSize[1],
         PPGT1 = omnibus_row$PPGT1[1]
     )
-    nope_fields <- c("R_PPGTnope", "R_nopeHigh", "E_PPGTnope", "E_nopeHigh", "enoughShufflesForNope")
+    nope_fields <- c(
+        "R_PPGTnope", "R_nopeHigh", "R_hdiAboveNope",
+        "E_PPGTnope", "E_nopeHigh", "E_hdiAboveNope",
+        "enoughShufflesForNope"
+    )
     for (nope_field in intersect(nope_fields, colnames(omnibus_row))) {
         omnibus[[nope_field]] <- omnibus_row[[nope_field]][1]
     }

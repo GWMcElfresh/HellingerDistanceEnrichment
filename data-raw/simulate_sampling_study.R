@@ -67,9 +67,9 @@ worker_functions <- function() {
         compute_observed_contrast(cohort$latent_counts, cohort$group, omnibus_spec, prior_pseudocounts = 0)
     }
 
-    resample_counts_at_depth <- function(cohort, reads_per_subject) {
+    resample_counts_at_depth <- function(cohort, cells_per_subject) {
         latent_freqs <- cohort$latent_counts / rowSums(cohort$latent_counts)
-        counts <- t(apply(latent_freqs, 1, function(freqs) stats::rmultinom(1, reads_per_subject, freqs)))
+        counts <- t(apply(latent_freqs, 1, function(freqs) stats::rmultinom(1, cells_per_subject, freqs)))
         dimnames(counts) <- dimnames(cohort$latent_counts)
         counts
     }
@@ -98,16 +98,16 @@ run_grid <- function(task_table, task_function) {
 # Scenario 1: NOPE calibration and power across depth. Null cohorts (no
 # shift) and 5-point-shift cohorts at three depths, 8 versus 8 subjects.
 nope_tasks <- expand.grid(
-    readsPerSubject = c(50, 500, 2000),
+    cellsPerSubject = c(50, 500, 2000),
     shift = c(0, 0.05),
     replicate = seq_len(n_cohorts_nope)
 )
-nope_tasks$cell <- as.integer(factor(paste(nope_tasks$readsPerSubject, nope_tasks$shift)))
+nope_tasks$cell <- as.integer(factor(paste(nope_tasks$cellsPerSubject, nope_tasks$shift)))
 nope_tasks$seed <- 1e6 * 1 + 1e3 * nope_tasks$cell + nope_tasks$replicate
 
 nope_calibration <- run_grid(nope_tasks, function(task) {
     cohort <- simulate_composition_cohort(
-        reads_per_subject = task$readsPerSubject,
+        cells_per_subject = task$cellsPerSubject,
         concentration = 50,
         shift = task$shift,
         seed = task$seed
@@ -115,15 +115,18 @@ nope_calibration <- run_grid(nope_tasks, function(task) {
     bayes <- helpers$run_omnibus_inference(cohort$long_table, "bayes", task$seed + 1)
     permutation <- helpers$run_omnibus_inference(cohort$long_table, "permutation", task$seed + 2)
     data.frame(
-        readsPerSubject = task$readsPerSubject,
+        cellsPerSubject = task$cellsPerSubject,
         shift = task$shift,
         replicate = task$replicate,
         PPGT1 = bayes$PPGT1,
         R_PPGTnope = bayes$R_PPGTnope,
         R_nopeHigh = bayes$R_nopeHigh,
+        R_hdiAboveNope = bayes$R_hdiAboveNope,
         E_PPGTnope = bayes$E_PPGTnope,
         E_nopeHigh = bayes$E_nopeHigh,
+        E_hdiAboveNope = bayes$E_hdiAboveNope,
         effectSize = bayes$effectSize,
+        effectCiLow = bayes$effectCiLow,
         energyDistance = bayes$energyDistance,
         energyCiLow = bayes$energyCiLow,
         pValue = permutation$pValue
@@ -140,12 +143,12 @@ depth_drift <- run_grid(depth_tasks, function(task) {
     cohort <- simulate_composition_cohort(concentration = 50, shift = 0.05, seed = task$seed)
     reference <- helpers$compute_reference(cohort)
     depths <- c(25, 50, 100, 250, 500, 1000, 2000, 5000)
-    do.call(rbind, lapply(depths, function(reads_per_subject) {
-        counts <- helpers$resample_counts_at_depth(cohort, reads_per_subject)
+    do.call(rbind, lapply(depths, function(cells_per_subject) {
+        counts <- helpers$resample_counts_at_depth(cohort, cells_per_subject)
         observed <- compute_observed_contrast(counts, cohort$group, helpers$omnibus_spec, prior_pseudocounts = 1 / 2)
         data.frame(
             replicate = task$replicate,
-            readsPerSubject = reads_per_subject,
+            cellsPerSubject = cells_per_subject,
             effectSize = observed$effectSize,
             energyDistance = observed$energyDistance,
             referenceEffectSize = reference$effectSize,
@@ -154,7 +157,7 @@ depth_drift <- run_grid(depth_tasks, function(task) {
     }))
 })
 
-# Scenario 3: heterogeneity sweep. One fixed 5-point shift at 2000 reads while
+# Scenario 3: heterogeneity sweep. One fixed 5-point shift at 2000 cells while
 # each group's concentration varies independently; the diagonal holds equal
 # spread, off-diagonal cells hold one group more variable than the other.
 heterogeneity_tasks <- expand.grid(
@@ -256,7 +259,9 @@ spread_only <- run_grid(spread_tasks, function(task) {
         pValue = permutation$pValue,
         PPGT1 = bayes$PPGT1,
         R_PPGTnope = bayes$R_PPGTnope,
+        R_hdiAboveNope = bayes$R_hdiAboveNope,
         E_PPGTnope = bayes$E_PPGTnope,
+        E_hdiAboveNope = bayes$E_hdiAboveNope,
         energyCiLow = bayes$energyCiLow
     )
 })
