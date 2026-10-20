@@ -24,6 +24,13 @@ parse_args <- function(args) {
             "  --n-posterior N       Posterior draws for bayes (default: 100)\n",
             "  --n-cores N           Parallel workers (default: 1)\n",
             "  --seed N              Random seed\n",
+            "  --credible-interval T Bayes interval: hpdi (default) or cpi\n",
+            "  --nope R              Bayes NOPE on R: shuffle (default),\n",
+            "                        none, or a number above 1 (fixed upper edge)\n",
+            "  --energy-nope E       Bayes NOPE on energy distance E: shuffle (default),\n",
+            "                        none, or a number above 0 (fixed upper edge)\n",
+            "  --n-nope-shuffles N   Label shuffles per posterior draw for the NOPE (default: 200)\n",
+            "  --include-pairwise    TRUE or FALSE (default: unset, all pairwises)\n",
             "  --output-dir PATH     Output directory (default: ./hellinger_output)\n",
             "  --plot                Write contrast PDF via ggplot2\n"
         ))
@@ -41,6 +48,11 @@ parse_args <- function(args) {
         n_posterior = 100,
         n_cores = 1,
         seed = NA,
+        credible_interval = "hpdi",
+        nope = "shuffle",
+        energy_nope = "shuffle",
+        n_nope_shuffles = 200,
+        include_pairwise = NA,
         output_dir = "./hellinger_output",
         plot = FALSE
     )
@@ -80,6 +92,26 @@ parse_args <- function(args) {
         }
         if (key == "--seed") {
             defaults$seed <- as.integer(args[i + 1]); i <- i + 2; next
+        }
+        if (key == "--credible-interval") {
+            defaults$credible_interval <- args[i + 1]; i <- i + 2; next
+        }
+        if (key == "--nope") {
+            # A numeric value is a fixed upper edge on R; keep keywords as text.
+            nope_value <- suppressWarnings(as.numeric(args[i + 1]))
+            defaults$nope <- if (is.na(nope_value)) args[i + 1] else nope_value
+            i <- i + 2; next
+        }
+        if (key == "--energy-nope") {
+            energy_nope_value <- suppressWarnings(as.numeric(args[i + 1]))
+            defaults$energy_nope <- if (is.na(energy_nope_value)) args[i + 1] else energy_nope_value
+            i <- i + 2; next
+        }
+        if (key == "--n-nope-shuffles") {
+            defaults$n_nope_shuffles <- as.integer(args[i + 1]); i <- i + 2; next
+        }
+        if (key == "--include-pairwise") {
+            defaults$include_pairwise <- args[i + 1]; i <- i + 2; next
         }
         if (key == "--output-dir") {
             defaults$output_dir <- args[i + 1]; i <- i + 2; next
@@ -149,28 +181,41 @@ main <- function() {
         opts$count_col
     )
 
+    include_pairwise <- if (is.na(opts$include_pairwise)) {
+        NULL
+    } else {
+        parsed <- toupper(as.character(opts$include_pairwise))
+        if (!parsed %in% c("TRUE", "FALSE")) {
+            stop("--include-pairwise must be TRUE or FALSE")
+        }
+        identical(parsed, "TRUE")
+    }
+
     result <- CompareGroupCompositions(
         composition,
         method = opts$method,
         nPermutations = opts$n_perm,
         nPosterior = opts$n_posterior,
         nCores = opts$n_cores,
-        seed = if (is.na(opts$seed)) NULL else opts$seed
+        seed = if (is.na(opts$seed)) NULL else opts$seed,
+        credibleInterval = opts$credible_interval,
+        includePairwise = include_pairwise,
+        nope = opts$nope,
+        energyNope = opts$energy_nope,
+        nNopeShuffles = opts$n_nope_shuffles
     )
 
     saveRDS(result, file.path(opts$output_dir, "hellinger_result.rds"))
     write.csv(result$contrasts, file.path(opts$output_dir, "contrasts.csv"), row.names = FALSE)
 
     omnibus_df <- if (identical(result$method, "bayes")) {
-        data.frame(
-            effectSize = result$omnibus$effectSize,
-            PPGT1 = result$omnibus$PPGT1,
-            effectCiLow = result$omnibus$effectCiLow,
-            effectCiHigh = result$omnibus$effectCiHigh
-        )
+        # The summary carries the R_ and E_ NOPE columns unless set to "none". Drop
+        # the per-draw vector, since this CSV is one summary row.
+        as.data.frame(result$omnibus[names(result$omnibus) != "draws"])
     } else {
         data.frame(
             effectSize = result$omnibus$effectSize,
+            energyDistance = result$omnibus$energyDistance,
             pValue = result$omnibus$pValue
         )
     }
@@ -182,7 +227,8 @@ main <- function() {
             filename = file.path(opts$output_dir, "contrasts.pdf"),
             plot = p,
             width = 7,
-            height = 5
+            # Two stacked panels (R above E) need roughly twice one panel's height.
+            height = 8
         )
     }
 

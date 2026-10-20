@@ -5,7 +5,7 @@
 #'
 #' @param freqs1 Numeric frequency vector (sums to 1).
 #' @param freqs2 Numeric frequency vector (sums to 1).
-#' @return Scalar Hellinger distance in \\eqn{[0, 1]}.
+#' @return Scalar Hellinger distance in \eqn{[0, 1]}.
 #' @keywords internal
 compute_hellinger_distance_freqs <- function(freqs1, freqs2) {
     diff_sqrt <- sqrt(freqs1) - sqrt(freqs2)
@@ -142,6 +142,41 @@ compute_between_within_ratio <- function(group_summary_matrix) {
     }
 
     between_mean / within_mean
+}
+
+#' Energy distance between groups from a group summary matrix.
+#'
+#' For two groups, \eqn{E} is twice the mean between-group Hellinger distance
+#' minus each group's mean within-group distance, on the same distances the
+#' ratio uses. With more groups, the function averages \eqn{E} over every pair
+#' of groups, the same pairing the ratio uses. Each within mean then enters
+#' \eqn{G - 1} pairs, so the average reduces to
+#' `2 * (mean between - mean within)`.
+#'
+#' Callers pass a summary built from squared Hellinger distances. Then \eqn{E}
+#' equals the squared distance between group centroids in square-root
+#' composition space, minus the sampling spread each centroid carries, so it
+#' measures a shift in mean composition with no division by within-group
+#' spread. Independent count noise adds equally to between- and within-group
+#' squared distances, so it cancels from \eqn{E} in expectation; Jeffreys
+#' softening and the curvature of the square root still shrink \eqn{E} at
+#' shallow depth. The sample estimate excludes each subject's distance to
+#' itself, so it can fall slightly below 0 when groups do not differ.
+#'
+#' @param group_summary_matrix Square matrix from
+#'   build_group_distance_summary_matrix on squared Hellinger distances.
+#' @return Scalar energy distance in squared Hellinger units.
+#' @keywords internal
+compute_energy_distance <- function(group_summary_matrix) {
+    within_mean <- mean(diag(group_summary_matrix), na.rm = FALSE)
+    between_values <- group_summary_matrix[upper.tri(group_summary_matrix)]
+    between_mean <- mean(between_values, na.rm = FALSE)
+
+    if (is.na(within_mean) || is.na(between_mean)) {
+        stop("cannot compute energy distance: insufficient subjects for pairwise distances in a contrast")
+    }
+
+    2 * (between_mean - within_mean)
 }
 
 #' Apply Jeffreys pseudocounts to a count matrix.

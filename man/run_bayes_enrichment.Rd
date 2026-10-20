@@ -2,20 +2,32 @@
 % Please edit documentation in R/compare-group-compositions.R
 \name{run_bayes_enrichment}
 \alias{run_bayes_enrichment}
-\title{Execute Bayes enrichment from Dirichlet posterior draws of R.}
+\title{Execute Bayes enrichment from Dirichlet posterior draws of R and E.}
 \usage{
 run_bayes_enrichment(
   composition,
   contrast_specs,
   n_posterior,
   n_cores,
-  prior_pseudocounts
+  prior_pseudocounts,
+  credible_interval = "hpdi",
+  nope = "shuffle",
+  energy_nope = "shuffle",
+  n_nope_shuffles = 200,
+  nope_quantile = 0.95
 )
 }
 \description{
 For each contrast, returns both a one-row posterior summary and the long
 draw table used by half-eye plots. Draw storage scales as
-\code{n_posterior * n_contrasts} effect sizes (omnibus excluded from the returned
-\code{draws}, matching \code{contrasts}).
+\code{n_posterior * n_contrasts} effect sizes, including omnibus, so the
+posterior of the global ratio can be inspected alongside pairwise draws.
+}
+\details{
+\code{R_PPGTnope} compares each draw's \eqn{R} with that same draw's \eqn{R} edge,
+and \code{E_PPGTnope} does the same for \eqn{E}; \code{R_nopeHigh} and \code{E_nopeHigh} in
+the summary are the medians of the per-draw edges. Shuffles consume the
+random stream between Dirichlet draws, so a fixed seed gives different draws
+when \code{nope} or \code{energy_nope} is \code{"shuffle"} than when neither is.
 }
 \keyword{internal}

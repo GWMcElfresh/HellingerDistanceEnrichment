@@ -14,6 +14,11 @@ CompareGroupCompositions(
   seed = NULL,
   priorPseudocounts = 1/2,
   pAdjustMethod = "holm",
+  credibleInterval = c("hpdi", "cpi"),
+  includePairwise = NULL,
+  nope = "shuffle",
+  energyNope = "shuffle",
+  nNopeShuffles = 200,
   ...
 )
 }
@@ -22,10 +27,11 @@ CompareGroupCompositions(
 
 \item{method}{Inference method: \code{"permutation"} or \code{"bayes"}.}
 
-\item{contrasts}{Optional named list of custom contrast specifications. Each
-element may be a length-2 character vector of group levels (pairwise subset)
-or a list with \code{collapse} (named remap of group levels) and/or \code{groups}
-(subset to these levels before testing).}
+\item{contrasts}{Planned comparisons, or \code{NULL} for every pairwise contrast.
+A length-2 character vector is one pairwise comparison. A list may mix
+length-2 character vectors and lists with \code{collapse} (named remap of group
+levels) and/or \code{groups} (subset to these levels before testing). Names
+become \code{contrastId} values; unnamed elements get \code{A_vs_B} identifiers.}
 
 \item{nPermutations}{Number of label permutations (permutation method only).}
 
@@ -39,17 +45,60 @@ or a list with \code{collapse} (named remap of group levels) and/or \code{groups
 
 \item{pAdjustMethod}{Multiple-testing adjustment for permutation contrasts (\code{"holm"}, \code{"BH"}, \code{"none"}). Ignored for Bayes.}
 
+\item{credibleInterval}{Bayes interval type: \code{"hpdi"} (default, shortest 95\%
+interval on the draws) or \code{"cpi"} (equal-tailed 2.5\%/97.5\% quantiles).
+Ignored for permutation.}
+
+\item{includePairwise}{Include every pairwise comparison in addition to
+\code{contrasts}. Default \code{NULL} includes pairwises when \code{contrasts} is omitted
+(the usual all-pairs analysis) and skips them when \code{contrasts} is supplied
+so Holm is paid only on the planned family. \code{FALSE} skips auto pairwises
+even when \code{contrasts} is omitted (omnibus only). \code{TRUE} keeps all pairwises
+even when \code{contrasts} is supplied (the old additive overlay).}
+
+\item{nope}{Bayes NOPE interval on \eqn{R}. \code{"shuffle"} (default) sets a
+permutation-calibrated null reference interval whose upper bound comes from label
+shuffles within each posterior draw. A single number above 1 sets a fixed
+NOPE bound on \eqn{R} that you choose in advance.
+Either adds \code{R_PPGTnope} and \code{R_nopeHigh} to the output. \code{"none"} drops
+them. Ignored for permutation.}
+
+\item{energyNope}{Bayes NOPE interval on the energy distance \eqn{E}, in
+squared Hellinger units. \code{"shuffle"} (default) sets a NOPE interval from
+the same label shuffles as \code{nope}. A single number above 0 sets a fixed
+NOPE bound on \eqn{E}; \code{\link[=ComputeEnergyNopeBound]{ComputeEnergyNopeBound()}} turns a composition shift
+into one. Either adds \code{E_PPGTnope} and
+\code{E_nopeHigh} to the output. \code{"none"} drops them. Ignored for permutation.}
+
+\item{nNopeShuffles}{Label shuffles per posterior draw used to set the
+NOPEs (default 200). Each shuffle builds one group summary per
+shuffled statistic, so cost scales as \code{nPosterior * nNopeShuffles}
+summaries per contrast for one NOPE and twice that for both. Used only
+when \code{method = "bayes"} and \code{nope} or
+\code{energyNope} is \code{"shuffle"}.}
+
 \item{...}{Ignored.}
 }
 \value{
-A HellingerEnrichmentResult with omnibus summary, pairwise
-\code{contrasts}, and (Bayes only) long-format posterior \code{draws} for plotting.
+A HellingerEnrichmentResult with omnibus summary, contrast table, and
+(Bayes only) long-format posterior \code{draws} including the omnibus draws.
+Bayes summaries carry \code{R_PPGTnope} and \code{R_nopeHigh} unless
+\code{nope = "none"}, \code{E_PPGTnope} and \code{E_nopeHigh} unless
+\code{energyNope = "none"} (each edge column is the median across draws of the
+per-draw upper edge), and \code{enoughShufflesForNope} when \code{nope} or \code{energyNope} is
+\code{"shuffle"} (\code{FALSE} when groups are too small for the NOPE, which is
+why the NOPE probabilities are then \code{NA}); \code{draws} carries the per-draw
+\code{R_nopeHigh} and \code{E_nopeHigh}. Both methods carry \code{energyDistance} beside
+the ratio \code{effectSize}; Bayes adds \code{energyCiLow}/\code{energyCiHigh} and
+per-draw \code{energyDistance} in \code{draws}.
 }
 \description{
 Tests whether between-group Hellinger distances exceed within-group distances
 using a permutation null or conjugate Dirichlet posterior-predictive Bayes.
-Computes an omnibus statistic plus all pairwise group contrasts and optional
-custom contrasts (subsets or collapses).
+Always reports an omnibus statistic. When \code{contrasts} is omitted, also tests
+every pairwise group comparison; when \code{contrasts} is supplied, those
+specifications are the contrast family (auto pairwises are omitted unless
+\code{includePairwise = TRUE}).
 }
 \details{
 The between/within Hellinger ratio, Jeffreys softening, observed-inclusive
@@ -57,10 +106,93 @@ label-permutation p-value, and collapse/subset contrasts follow Paul
 Edlefsen's original procedure. \code{method = "bayes"} instead draws subject
 compositions from a conjugate Dirichlet posterior, rebuilds the Hellinger
 ratio \eqn{R} on each draw, and reports the posterior probability that
-\eqn{R > 1} (\code{PPGT1}).
+\eqn{R > 1} (\code{PPGT1}) with a 95\% highest posterior density interval on \eqn{R}
+by default.
+
+\code{PPGT1} alone overstates enrichment when counts are deep. The Dirichlet
+posterior only describes count noise within each subject, so as depth grows
+it concentrates on the sample \eqn{R}, which is rarely exactly 1 even when
+groups do not differ. With \code{nope = "shuffle"} (the default), the package
+reports a Null-Oriented Permutation Equivalence (NOPE) interval on \eqn{R}:
+a permutation-calibrated null reference interval for conditional effects. Within each posterior draw, the package shuffles group
+labels on that draw's own distance matrix, so the interval is conditional on
+the observed design (group sizes, depths, within-group spread) and on that
+draw's compositions. The goal parallels a permutation test, but NOPE
+reports a region instead of a p-value. The NOPE interval for \eqn{R} runs from 1 to the 95th
+percentile of the shuffled \eqn{R}; \code{R_nopeHigh} is the median of that upper
+bound across draws, and \code{R_PPGTnope} is the posterior probability that
+\eqn{R} clears it. \code{energyNope = "shuffle"} (also the default) builds the
+matching interval for the energy distance \eqn{E} from the same shuffles,
+from 0 to \code{E_nopeHigh}, and reports \code{E_PPGTnope}.
+
+NOPE borrows the equivalence logic of Kruschke's region of practical
+equivalence (ROPE) and changes two things. In Kruschke's procedure the
+analyst fixes the region before seeing the data, from domain knowledge of
+which effects are negligible, and the decision compares the 95\% highest
+density interval with that region. Few analysts have that intuition for a
+ratio of Hellinger distances or an energy distance, so NOPE takes its upper
+bound from the data: the largest value of the statistic these subjects
+routinely produce when labels carry no information. The bound also differs
+from draw to draw, and each NOPE probability counts the draws that clear
+their own bound. NOPE therefore acts as a null reference calibrated by
+permutation, closer to a permutation test than to a statement of practical
+significance. When you know the smallest effect that matters, pass it as a
+fixed NOPE bound, which plays the role of Kruschke's preset region:
+\verb{nope = <number above 1>} on \eqn{R}, or \verb{energyNope = <number above 0>} on
+\eqn{E} in squared Hellinger units. A fixed bound needs no shuffles, so it
+also works for groups too small for a NOPE interval.
+
+To set a fixed bound on \eqn{E} from a composition shift, pass the reference
+and shifted compositions to ComputeEnergyNopeBound and hand its result to
+\code{energyNope}. It returns \eqn{2(1 - \mathrm{BC})}{2(1 - BC)}, with BC the Bhattacharyya
+coefficient between the two compositions, which equals \eqn{E} when every
+subject sits at its group's mean and approximates it otherwise.
+
+Because shuffling keeps the observed group sizes, depths, and within-group
+spread, the NOPE widens or narrows with the data rather than relying on a
+fixed number. Each draw's edge never falls below the no-difference value (1
+for \eqn{R}, 0 for \eqn{E}), so \code{R_PPGTnope <= PPGT1} always holds, and
+\code{E_PPGTnope} never exceeds the posterior probability that \eqn{E > 0}.
+Reading a NOPE probability above 0.95 asks that nearly every draw clear
+its own 95th shuffle percentile, which runs well below a 5\% false-positive
+rate and costs power; a looser threshold such as 0.5 behaves more like the
+permutation test. The sampling-depth vignette measures both. Very small
+groups limit the NOPE the same way they limit the permutation p-value.
+With 3 versus 3 subjects there are only 10 distinct splits, so the true
+split alone is 10\% of all shuffles and neither statistic can clear its 95th
+percentile. Whenever the true split is at least 5\% of shuffles (e.g. 2
+versus 2, 3 versus 3, 2 versus 4), the function sets each NOPE
+probability to \code{NA} with a warning rather than a misleading 0, and
+\code{enoughShufflesForNope} is \code{FALSE} so the reason travels with the result;
+4 versus 4 (35 splits) is the smallest balanced design that supports it.
+
+Both methods also report the energy distance between groups
+(\code{energyDistance}): twice the mean between-group squared Hellinger distance
+minus each group's mean within-group squared distance, averaged over group
+pairs for the omnibus. Squaring the existing distance matrix costs nothing
+extra. \eqn{R} measures how far apart the groups are relative to how spread
+out they are; \eqn{E} measures the shift in mean composition itself, as the
+squared distance between group centroids in square-root composition space,
+with no division. Independent count noise adds equally to between- and
+within-group squared distances and cancels from \eqn{E} in expectation, but
+Jeffreys softening and the curvature of the square root still shrink \eqn{E}
+at shallow depth, though less than they shrink the excess of \eqn{R} over 1
+(see the sampling-depth vignette). \eqn{E} responds mainly to shifts in mean
+composition; a difference in spread alone moves it only slightly, likely
+through that same curvature. The sample estimate excludes each subject's
+distance to itself, so it can dip slightly below 0 when groups do not
+differ. The p-values and \code{PPGT1} stay on \eqn{R}; under Bayes the package
+reports a posterior interval on \eqn{E} (\code{energyCiLow}, \code{energyCiHigh}) and,
+with \code{energyNope}, \code{E_PPGTnope}.
 }
 \references{
 Edlefsen, P. Hellinger between/within enrichment for subject-level
 categorical compositions (Jeffreys softening, ratio statistic, label
 permutation, collapse/subset contrasts).
+
+Kruschke, J. K. (2018). Rejecting or accepting parameter values in Bayesian
+estimation. Advances in Methods and Practices in Psychological Science,
+1(2), 270-280. \doi{10.1177/2515245918771304}. Article page:
+\url{https://www.psychologicalscience.org/journals/ampps/2515245918771304/}; open-access record:
+\url{https://scholarworks.iu.edu/dspace/items/bada026d-fe1b-4f53-ad5b-db6e8bf99711}
 }
